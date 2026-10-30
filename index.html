@@ -107,8 +107,6 @@ svg.i.fill { fill: currentColor; stroke: none; }
 .spacer { flex: 1; }
 .stat { color: var(--faint); font: 400 var(--fs-s) var(--mono); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .filterchip { display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 4px 0 8px; border-radius: 11px; background: var(--accent-soft); color: var(--accent); font-weight: 500; }
-.filterchip button { display: grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; }
-.filterchip button:hover { background: var(--panel); }
 
 /* ---------- layout ---------- */
 .layout { display: grid; grid-template-columns: 220px minmax(0, 1fr); min-height: calc(100% - 37px); }
@@ -270,6 +268,24 @@ textarea::placeholder { color: var(--faint); }
 .plq.pov { width: 76px; }
 .plq.place { width: 104px; background: color-mix(in srgb, var(--c, var(--bg)) 14%, var(--panel)); border-color: color-mix(in srgb, var(--c, var(--line)) 35%, var(--line)); }
 .plq.chars { width: 78px; padding-left: 4px; }
+.plq.threads { width: 92px; }
+.tbars { display: inline-flex; gap: 2px; flex: none; }
+.tbar { width: 4px; height: 12px; border-radius: 2px; background: var(--c); }
+.swatch.thr { border-radius: 2px; width: 6px; height: 14px; }
+.tchips { display: flex; flex-wrap: wrap; gap: 4px; padding: 2px 0 0 5px; }
+.tchip { display: inline-flex; align-items: center; gap: 5px; height: 20px; padding: 0 8px 0 6px; border-radius: 10px; font-size: var(--fs-s); color: var(--fg);
+  background: color-mix(in srgb, var(--c) 14%, var(--panel)); border: 1px solid color-mix(in srgb, var(--c) 40%, var(--line)); }
+.tchip::before { content: ""; width: 4px; height: 10px; border-radius: 2px; background: var(--c); }
+.tchip:hover { border-color: var(--c); }
+.filterchip { gap: 4px; padding: 0 3px 0 8px; height: 24px; }
+.filterchip .fc-name { font-weight: 600; max-width: 18ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fc-mode { display: inline-flex; border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent); border-radius: 9px; overflow: hidden; margin-left: 2px; }
+.fc-mode button { height: 18px; padding: 0 7px; font-size: 10.5px; font-weight: 500; color: var(--accent); }
+.fc-mode button.on { background: var(--accent); color: var(--panel); }
+.filterchip .fc-x { display: grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; }
+.filterchip .fc-x:hover { background: var(--panel); }
+.pk-mode { color: var(--muted); font-size: 12px; cursor: pointer; }
+.pk-mode input { margin: 0 4px 0 2px; }
 .plq .t { overflow: hidden; text-overflow: ellipsis; min-width: 0; color: var(--fg); }
 .plq.empty { background: none; border-style: dashed; color: var(--faint); opacity: 0; }
 .row:hover .plq.empty, .row:focus-within .plq.empty, .plq.empty:focus-visible { opacity: 1; }
@@ -391,6 +407,8 @@ html { touch-action: manipulation; }
 .legend span { display: inline-flex; align-items: center; gap: 4px; }
 
 /* ---------- narrow screens ---------- */
+@media (max-width: 1440px) { .bar .tb .lbl { display: none; } }
+@media (max-width: 760px) { .bar .tb .lbl { display: inline; } }
 @media (max-width: 1280px) { .seg-label, .stat { display: none; } .search { flex-basis: 160px; } }
 @media (max-width: 760px) {
   .layout, .layout.norail { grid-template-columns: minmax(0, 1fr); }
@@ -407,6 +425,8 @@ html { touch-action: manipulation; }
   .plq.pov { width: auto; }
   .plq.pov .t { display: none; }
   .plq.chars { width: auto; }
+  .plq.threads { width: auto; }
+  .plq.threads .t { display: none; }
   .peek { display: none; }
   .body { padding-left: 10px; }
   .kids { margin-left: 4px; padding-left: 6px; }
@@ -439,6 +459,7 @@ const ICONS = {
   clock: '<circle cx="8" cy="8" r="6.3"/><path d="M8 4.6V8l2.4 1.5"/>',
   cloud: '<path d="M4.6 12.6h6.9a2.9 2.9 0 0 0 .3-5.8 3.9 3.9 0 0 0-7.5 1 2.4 2.4 0 0 0 .3 4.8z"/>',
   ai: '<path d="M8 1.8l1.5 3.9 3.9 1.5-3.9 1.5L8 12.6 6.5 8.7 2.6 7.2l3.9-1.5z"/><path d="M12.6 10.6l.6 1.5 1.5.6-1.5.6-.6 1.5-.6-1.5-1.5-.6 1.5-.6z"/>',
+  thread: '<path d="M1.8 11.5c2.2 0 2.6-7 5.2-7s2.4 7 5 7"/><circle cx="13.6" cy="11.5" r="1.4"/>',
   plus: '<path d="M8 3.2v9.6M3.2 8h9.6"/>',
   search: '<circle cx="7" cy="7" r="4.3"/><path d="M10.3 10.3L14 14"/>',
   filter: '<path d="M2.2 3h11.6L9.4 8.4v4.4l-2.8-1.4v-3z"/>',
@@ -480,12 +501,12 @@ function h(tag, props, ...kids) {
     else if (k === 'value') el.value = v;
     else el.setAttribute(k, v === true ? '' : v);
   }
-  for (const c of kids.flat()) if (c != null && c !== false) el.append(c.nodeType ? c : document.createTextNode(c));
+  for (const c of kids.flat(Infinity)) if (c != null && c !== false) el.append(c.nodeType ? c : document.createTextNode(c));
   return el;
 }
 function setKids(el, ...kids) {
   el.replaceChildren();
-  for (const c of kids.flat()) if (c != null && c !== false) el.append(c.nodeType ? c : document.createTextNode(c));
+  for (const c of kids.flat(Infinity)) if (c != null && c !== false) el.append(c.nodeType ? c : document.createTextNode(c));
 }
 // Titles and quoted or bracketed nicknames are skipped for initials: "Dr. Felix Harrow" → FH.
 const HONORIFIC = /^(dr|prof|professor|dean|major|captain|capt|mr|mrs|ms|miss|sir|lady|lord)\.?$/i;
@@ -530,7 +551,7 @@ let query = '';
 let railOpen = true;
 const undoStack = [];
 
-function blankScene(title = '') { return { id: uid(), type: 'scene', title, summary: '', details: '', pov: null, place: null, chars: [], status: 0, open: 0 }; }
+function blankScene(title = '') { return { id: uid(), type: 'scene', title, summary: '', details: '', pov: null, place: null, chars: [], threads: [], status: 0, open: 0 }; }
 function blankSection(title = '') { return { id: uid(), type: 'section', title, collapsed: false, children: [] }; }
 function blankHolding() { return { id: 'holding', type: 'section', title: 'Holding', collapsed: false, children: [] }; }
 function blankTime(label = '') { return { id: uid(), type: 'time', label, month: 0, weather: '' }; }
@@ -606,7 +627,10 @@ const CHAR_FIELDS = [
   { k: 'note', label: 'Other notes', hint: 'Anything else: secrets, plot notes, reminders' },
 ];
 const PLACE_FIELDS = [{ k: 'note', label: 'Description', hint: 'What it looks, sounds and smells like, who goes there, what happened here' }];
-const fieldsFor = (type) => (type === 'place' ? PLACE_FIELDS : CHAR_FIELDS);
+const THREAD_FIELDS = [{ k: 'note', label: 'Description', hint: 'What this thread is about, who drives it, where it’s heading' }];
+const fieldsFor = (type) => (type === 'place' ? PLACE_FIELDS : type === 'thread' ? THREAD_FIELDS : CHAR_FIELDS);
+const libFor = (type) => (type === 'place' ? S.places : type === 'thread' ? S.threads : S.characters);
+const threadById = (id) => S.threads.find((t) => t.id === id);
 
 // Notes imported in the "Title / Group · Track · Age" layout are split into profile fields once.
 // Anything that doesn't fit a field stays in Other notes, so nothing is lost.
@@ -665,10 +689,11 @@ function normalize(s) {
   s.title = s.title || 'Untitled novel';
   s.characters = Array.isArray(s.characters) ? s.characters : [];
   s.places = Array.isArray(s.places) ? s.places : [];
+  s.threads = Array.isArray(s.threads) ? s.threads : [];
   s.climate = Array.from({ length: 12 }, (_, i) => (s.climate && s.climate[i]) || '');
-  s.ui = s.ui || {}; s.ui.lib = Object.assign({ chars: true, places: true, climate: false }, s.ui.lib);
+  s.ui = s.ui || {}; s.ui.lib = Object.assign({ chars: true, places: true, threads: true, climate: false }, s.ui.lib);
   if (s.ui.heat == null) s.ui.heat = true;
-  for (const lib of [s.characters, s.places]) for (const x of lib) { x.id = x.id || uid(); x.name = x.name || ''; x.color = x.color || PALETTE[0]; x.note = x.note || ''; }
+  for (const lib of [s.characters, s.places, s.threads]) for (const x of lib) { x.id = x.id || uid(); x.name = x.name || ''; x.color = x.color || PALETTE[0]; x.note = x.note || ''; }
   for (const c of s.characters) {
     if (!c.profile) { splitProfileNote(c); c.profile = 1; }
     for (const f of CHAR_FIELDS) c[f.k] = typeof c[f.k] === 'string' ? c[f.k] : '';
@@ -680,13 +705,13 @@ function normalize(s) {
   walk([...s.items, s.holding], (n) => {
     n.id = n.id || uid();
     if (n.type === 'section') n.children = Array.isArray(n.children) ? n.children : [];
-    if (n.type === 'scene') { n.chars = Array.isArray(n.chars) ? n.chars : []; n.open = n.open || 0; n.status = n.status || 0; n.heat = n.heat >= 1 && n.heat <= 5 ? n.heat : 0; }
+    if (n.type === 'scene') { n.chars = Array.isArray(n.chars) ? n.chars : []; n.threads = Array.isArray(n.threads) ? n.threads : []; n.open = n.open || 0; n.status = n.status || 0; n.heat = n.heat >= 1 && n.heat <= 5 ? n.heat : 0; }
   });
   return s;
 }
 function load() {
   try { const j = localStorage.getItem(KEY); if (j) return normalize(JSON.parse(j)); } catch (e) { /* fall through to sample */ }
-  return sample();
+  return normalize(sample());
 }
 let saveT;
 function save() {
@@ -723,6 +748,7 @@ function sceneMatches(s) {
   if (filter) {
     if (filter.type === 'char' && !(s.chars.includes(filter.id) || s.pov === filter.id)) return false;
     if (filter.type === 'place' && s.place !== filter.id) return false;
+    if (filter.type === 'thread' && !s.threads.includes(filter.id)) return false;
   }
   if (query) {
     const q = query.toLowerCase();
@@ -731,6 +757,10 @@ function sceneMatches(s) {
   return true;
 }
 const filtering = () => !!(filter || query);
+// "Show only" hides what doesn't match instead of dimming it.
+const hiding = () => filtering() && !!S.ui.only;
+const sectionMatches = (sec) => { let any = false; walk(sec.children, (x) => { if (x.type === 'scene' && sceneMatches(x)) any = true; }); return any; };
+const filterTarget = () => filter && (libFor(filter.type) || []).find((x) => x.id === filter.id);
 
 /* ================= rendering ================= */
 function renderAll() { renderBar(); renderTree(); renderRail(); renderBanner(); }
@@ -771,6 +801,7 @@ function renderTree() {
   renderList(S.items, frag, 0, nums);
   root.replaceChildren(frag);
   if (!S.items.length) root.append(h('div', { class: 'emptykid' }, 'Nothing here yet. Start with a section (like “Part One” or “Arrival day”) or a scene below.'));
+  else if (hiding() && !root.querySelector('.scene')) root.append(h('div', { class: 'emptykid' }, 'No scenes match this filter yet.'));
   setKids($('#holding'), renderHolding(nums));
   document.querySelectorAll('main textarea').forEach(grow);
   renderStat();
@@ -825,6 +856,7 @@ function openHeat(anchor, scene) {
 }
 function renderList(list, into, depth, nums) {
   for (const n of list) {
+    if (hiding() && ((n.type === 'scene' && !sceneMatches(n)) || (n.type === 'section' && !sectionMatches(n)))) continue;
     if (n.type === 'section') into.append(renderSection(n, depth, nums));
     else if (n.type === 'scene') into.append(renderScene(n, nums.get(n.id)));
     else if (n.type === 'time') into.append(renderTime(n));
@@ -844,7 +876,7 @@ function dotsBtn(n) {
 function renderSection(n, depth, nums) {
   const count = scenesIn(n);
   let anyMatch = true;
-  if (filtering()) { anyMatch = false; walk(n.children, (x) => { if (x.type === 'scene' && sceneMatches(x)) anyMatch = true; }); }
+  if (filtering()) anyMatch = sectionMatches(n);
   const add = (type) => (e) => { e.stopPropagation(); addInside(n, type); };
   const row = h('div', { class: 'row' },
     grip(),
@@ -912,6 +944,8 @@ function renderScene(n, num) {
   if (open > 0) {
     const wc = words(n.details);
     node.append(h('div', { class: 'body' },
+      n.threads.length ? h('div', { class: 'tchips' }, n.threads.map(threadById).filter(Boolean).map((t) =>
+        h('button', { class: 'tchip', style: `--c:${t.color}`, title: `Show only scenes in “${t.name}”`, onclick: () => { filter = { type: 'thread', id: t.id }; S.ui.only = true; save(); renderAll(); } }, t.name))) : null,
       area('summary', n.summary, 'Short description of this scene…', (v) => { n.summary = v; }),
       h('button', { class: 'more' + (open > 1 ? ' on' : ''), 'aria-expanded': String(open > 1), onclick: () => { n.open = open > 1 ? 1 : 2; save(); renderTree(); } },
         icon('right'), 'Details', wc ? h('span', { class: 'wc' }, `${wc}w`) : null),
@@ -926,7 +960,11 @@ function plaques(n) {
   const cs = n.chars.map(charById).filter(Boolean);
   const pick = (kind) => (e) => { e.stopPropagation(); openPicker(e.currentTarget, kind, n); };
   const shown = cs.slice(0, 4);
+  const ts = n.threads.map(threadById).filter(Boolean);
   return h('span', { class: 'plaques' },
+    h('button', { class: 'plq threads' + (ts.length ? '' : ' empty'), title: ts.length ? 'Plot threads: ' + ts.map((t) => t.name).join(', ') : 'Add to a plot thread', onclick: pick('threads') },
+      ts.length ? [h('span', { class: 'tbars' }, ts.slice(0, 5).map((t) => h('span', { class: 'tbar', style: `--c:${t.color}` }))), h('span', { class: 't' }, ts.length === 1 ? ts[0].name : `${ts.length} threads`)]
+        : [icon('thread'), h('span', { class: 't' }, 'Thread')]),
     h('button', { class: 'plq chars' + (cs.length ? '' : ' empty'), title: cs.length ? 'Present: ' + cs.map((c) => c.name).join(', ') : 'Add characters present', onclick: pick('chars') },
       cs.length ? [h('span', { class: 'stack' }, shown.map((c) => h('span', { class: 'av', style: `--c:${c.color}` }, initials(c.name)))),
         cs.length > 4 ? h('span', { class: 'more-n' }, `+${cs.length - 4}`) : null]
@@ -951,7 +989,7 @@ function renderTime(n) {
     h('span', { class: 'sep' }, icon('cloud')),
     editable('weather' + (clim ? ' auto' : ''), n.weather, clim ? clim : (n.month ? 'Typical weather… (add it in Climate)' : 'Weather…'), (v) => { n.weather = v; }),
     dotsBtn(n));
-  return h('div', { class: 'node time' + (filtering() ? ' dim' : ''), 'data-id': n.id }, row);
+  return h('div', { class: 'node time' + (filtering() && !hiding() ? ' dim' : ''), 'data-id': n.id }, row);
 }
 
 /* ================= toolbar ================= */
@@ -959,15 +997,20 @@ function renderBar() {
   const bar = $('#bar');
   const levels = [['Collapse all', 0, 'Fold everything down to section headings'], ['Titles', 1, 'Open every section and show scene titles only'],
     ['Descriptions', 2, 'Show each scene’s short description'], ['Everything', 3, 'Show descriptions and details']];
-  const fl = filter && (filter.type === 'char' ? charById(filter.id) : placeById(filter.id));
+  const fl = filterTarget();
   const searchInput = h('input', { id: 'q', type: 'search', placeholder: 'Search scenes  /', value: query, 'aria-label': 'Search scenes',
     oninput: (e) => { query = e.target.value.trim(); renderTree(); } });
   setKids(bar, 
     h('button', { class: 'tb' + (railOpen ? ' on' : ''), title: 'Characters, places & climate', 'aria-label': 'Toggle library', onclick: () => { railOpen = !railOpen; applyRail(); renderBar(); } }, icon('rail')),
     h('div', { class: 'brand' }, h('span', { class: 'app' }, 'Scene Flow'), editable('book', S.title, 'Book title', (v) => { S.title = v; })),
     h('label', { class: 'search' }, icon('search'), searchInput),
-    fl ? h('span', { class: 'filterchip' }, icon('filter'), fl.name || '(unnamed)',
-      h('button', { 'aria-label': 'Clear filter', title: 'Clear filter', onclick: () => { filter = null; renderAll(); } }, icon('x'))) : null,
+    fl ? h('span', { class: 'filterchip' }, icon(filter.type === 'thread' ? 'thread' : filter.type === 'place' ? 'pin' : 'people'),
+        h('button', { class: 'fc-name', title: 'Change filter', onclick: (e) => openFilterPicker(e.currentTarget) }, fl.name || '(unnamed)'),
+        h('span', { class: 'fc-mode', role: 'group', 'aria-label': 'Other scenes' },
+          h('button', { class: S.ui.only ? '' : 'on', 'aria-pressed': String(!S.ui.only), title: 'Dim scenes that don’t match', onclick: () => { S.ui.only = false; save(); renderAll(); } }, 'Dim others'),
+          h('button', { class: S.ui.only ? 'on' : '', 'aria-pressed': String(!!S.ui.only), title: 'Hide scenes that don’t match', onclick: () => { S.ui.only = true; save(); renderAll(); } }, 'Show only')),
+        h('button', { class: 'fc-x', 'aria-label': 'Clear filter', title: 'Clear filter', onclick: () => { filter = null; renderAll(); } }, icon('x')))
+      : h('button', { class: 'tb', title: 'Show scenes with a character, place or plot thread', onclick: (e) => openFilterPicker(e.currentTarget) }, icon('filter'), 'Filter'),
     h('span', { class: 'spacer' }),
     h('span', { class: 'seg-label' }, 'View'),
     h('span', { class: 'seg', role: 'group', 'aria-label': 'Expand outline to' }, levels.map(([label, l, tip]) => h('button', { title: tip, onclick: () => setLevel(l) }, label))),
@@ -976,7 +1019,7 @@ function renderBar() {
     h('span', { class: 'stat', id: 'stat' }),
     h('button', { class: 'tb', title: 'Undo (Ctrl/⌘+Z)', onclick: undo }, icon('undo')),
     h('button', { class: 'tb', title: 'Copy a readable outline to paste into an AI chat', onclick: openAiExport }, icon('ai'), 'Share with AI'),
-    h('button', { class: 'tb', title: 'Back up or restore your outline', onclick: openBackup }, icon('save'), 'Backup'));
+    h('button', { class: 'tb', title: 'Back up or restore your outline', onclick: openBackup, 'aria-label': 'Backup' }, icon('save'), h('span', { class: 'lbl' }, 'Backup')));
   renderStat();
 }
 function renderStat() {
@@ -1007,13 +1050,14 @@ function renderRail() {
   const usage = new Map();
   walk(S.items, (n) => {
     if (n.type !== 'scene') return;
-    const ids = new Set([...n.chars, n.pov, n.place].filter(Boolean));
+    const ids = new Set([...n.chars, ...n.threads, n.pov, n.place].filter(Boolean));
     ids.forEach((id) => usage.set(id, (usage.get(id) || 0) + 1));
   });
   setKids(rail,
     h('button', { class: 'rail-close', onclick: closeRail }, 'Close', icon('x')),
     libGroup('chars', 'Characters', S.characters, 'char', usage, 'Add character…'),
     libGroup('places', 'Places', S.places, 'place', usage, 'Add place…'),
+    libGroup('threads', 'Plot threads', S.threads, 'thread', usage, 'Add plot thread…'),
     climateGroup(),
     h('div', { class: 'legend' },
       h('span', null, h('span', { class: 'st', 'data-s': 0 }), 'Planned'),
@@ -1029,11 +1073,11 @@ function groupHead(key, label, n) {
     h('span', { class: 'caret' }, icon('right')), label, n != null ? h('span', { class: 'n' }, n) : null);
 }
 function libGroup(key, label, lib, type, usage, ph) {
-  const g = h('div', { class: 'grp' + (S.ui.lib[key] ? ' open' : '') }, groupHead(key, label, lib.length));
+  const g = h('div', { class: 'grp' + (S.ui.lib[key] ? ' open' : ''), 'data-key': key }, groupHead(key, label, lib.length));
   if (!S.ui.lib[key]) return g;
   for (const x of lib) {
     const on = filter && filter.id === x.id;
-    const sw = h('label', { class: 'swatch' + (type === 'place' ? ' sq' : ''), style: `--c:${x.color}`, title: 'Change colour' },
+    const sw = h('label', { class: 'swatch' + (type === 'place' ? ' sq' : type === 'thread' ? ' thr' : ''), style: `--c:${x.color}`, title: 'Change colour' },
       h('input', { type: 'color', value: x.color, 'aria-label': `Colour for ${x.name}`,
         oninput: (e) => { x.color = e.target.value; sw.style.setProperty('--c', x.color); save(); renderTreeSoon(); } }));
     const openIt = () => openDetails(x, type, usage.get(x.id) || 0);
@@ -1050,24 +1094,24 @@ function libGroup(key, label, lib, type, usage, ph) {
     onkeydown: (e) => {
       if (e.key !== 'Enter' || !inp.value.trim()) return;
       snapshot(); createLib(type, inp.value.trim()); save(); renderAll();
-      setTimeout(() => $(`#rail .grp:nth-child(${type === 'place' ? 2 : 1}) .lib-add input`)?.focus());
+      setTimeout(() => $(`#rail .grp[data-key="${key}"] .lib-add input`)?.focus());
     } });
   g.append(h('label', { class: 'lib-add' }, icon('plus'), inp));
   return g;
 }
 function openDetails(x, type, count) {
   closePop();
-  const what = type === 'place' ? 'place' : 'character';
+  const what = type === 'place' ? 'place' : type === 'thread' ? 'plot thread' : 'character';
   const fields = fieldsFor(type);
   const filled = () => fields.some((f) => (x[f.k] || '').trim());
   let editing = !filled();
   const close = () => { scrim.remove(); renderRail(); renderTree(); };
-  const badge = h('span', { class: type === 'place' ? 'swatch sq' : 'av', style: `--c:${x.color}` }, type === 'place' ? null : initials(x.name));
+  const badge = h('span', { class: type === 'place' ? 'swatch sq' : type === 'thread' ? 'swatch thr' : 'av', style: `--c:${x.color}` }, type === 'char' ? initials(x.name) : null);
   const colour = h('label', { class: 'colour-pick', title: 'Change colour' }, badge,
     h('input', { type: 'color', value: x.color, 'aria-label': 'Colour',
       oninput: (e) => { x.color = e.target.value; badge.style.setProperty('--c', x.color); save(); } }));
   const name = h('input', { id: 'details-name', class: 'details-name', value: x.name, placeholder: `Name this ${what}`, 'aria-label': 'Name', spellcheck: 'false',
-    oninput: () => { x.name = name.value; if (type !== 'place') badge.textContent = initials(x.name); save(); } });
+    oninput: () => { x.name = name.value; if (type === 'char') badge.textContent = initials(x.name); save(); } });
   const body = h('div', { class: 'profile' });
   const modeBtn = h('button', { class: 'btn', onclick: () => { editing = !editing; draw(); } });
   let armed = false;
@@ -1110,7 +1154,7 @@ function openDetails(x, type, count) {
         val('alias') || chips.length ? h('div', { class: 'pf-top' },
           val('alias') ? h('div', { class: 'pf-alias' }, val('alias')) : null,
           chips.length ? h('div', { class: 'pf-chips' }, chips.map((t) => h('span', { class: 'pf-chip' }, t))) : null) : null,
-        type === 'place' ? para('note') : [
+        type !== 'char' ? para('note') : [
           para('appearance'), para('power'),
           growth ? h('section', { class: 'pf-sec' }, h('h3', null, 'Power growth'),
             val('growth') ? h('div', { class: 'pf-text' }, val('growth')) : null,
@@ -1143,7 +1187,7 @@ function climateGroup() {
   return g;
 }
 function createLib(type, name) {
-  const lib = type === 'place' ? S.places : S.characters;
+  const lib = libFor(type);
   const used = new Set(lib.map((x) => x.color));
   const color = PALETTE.find((c) => !used.has(c)) || PALETTE[lib.length % PALETTE.length];
   const x = { id: uid(), name, color, note: '' };
@@ -1153,11 +1197,12 @@ function createLib(type, name) {
 }
 function removeLib(type, x) {
   snapshot();
-  const lib = type === 'place' ? S.places : S.characters;
+  const lib = libFor(type);
   lib.splice(lib.indexOf(x), 1);
   walk(everything(), (n) => {
     if (n.type !== 'scene') return;
     if (type === 'place' && n.place === x.id) n.place = null;
+    if (type === 'thread') n.threads = n.threads.filter((t) => t !== x.id);
     if (type === 'char') { n.chars = n.chars.filter((c) => c !== x.id); if (n.pov === x.id) n.pov = null; }
   });
   if (filter && filter.id === x.id) filter = null;
@@ -1189,28 +1234,29 @@ function place(el, anchor) {
 }
 function openPicker(anchor, kind, scene) {
   closePop();
-  const lib = kind === 'place' ? S.places : S.characters;
-  const isSel = (x) => kind === 'chars' ? scene.chars.includes(x.id) : scene[kind] === x.id;
-  const input = h('input', { class: 'pk-search', placeholder: kind === 'place' ? 'Find or add a place…' : 'Find or add a character…', 'aria-label': 'Find or add' });
+  const multi = kind === 'chars' || kind === 'threads';
+  const lib = kind === 'place' ? S.places : kind === 'threads' ? S.threads : S.characters;
+  const isSel = (x) => multi ? scene[kind].includes(x.id) : scene[kind] === x.id;
+  const input = h('input', { class: 'pk-search', placeholder: kind === 'place' ? 'Find or add a place…' : kind === 'threads' ? 'Find or add a plot thread…' : 'Find or add a character…', 'aria-label': 'Find or add' });
   const list = h('div', { class: 'pk-list', role: 'listbox' });
   const choose = (x) => {
     snapshot();
-    if (kind === 'chars') {
-      scene.chars = isSel(x) ? scene.chars.filter((c) => c !== x.id) : [...scene.chars, x.id];
+    if (multi) {
+      scene[kind] = isSel(x) ? scene[kind].filter((c) => c !== x.id) : [...scene[kind], x.id];
     } else {
       scene[kind] = x && scene[kind] !== x.id ? x.id : null;
       if (kind === 'pov' && scene.pov && !scene.chars.includes(scene.pov)) scene.chars.unshift(scene.pov);
     }
     save(); renderTree(); renderRail();
-    if (kind === 'chars') { draw(); if (!TOUCH) input.focus(); } else closePop();
+    if (multi) { draw(); if (!TOUCH) input.focus(); } else closePop();
   };
   const create = () => {
     const name = input.value.trim(); if (!name) return;
-    const x = createLib(kind === 'place' ? 'place' : 'char', name);
+    const x = createLib(kind === 'place' ? 'place' : kind === 'threads' ? 'thread' : 'char', name);
     input.value = '';
     choose(x);
     // The keyboard is already up after typing a name, so keep it there for the next one.
-    if (kind === 'chars') input.focus();
+    if (multi) input.focus();
   };
   let visible = [], hi = 0;
   const opts = () => [...list.querySelectorAll('.pk-item')];
@@ -1222,11 +1268,11 @@ function openPicker(anchor, kind, scene) {
     visible = lib.filter((x) => x.name.toLowerCase().includes(q));
     if (q) visible.sort((a, b) => rank(a, q) - rank(b, q));
     setKids(list, 
-      h('div', { class: 'pk-head' }, kind === 'pov' ? 'Point of view' : kind === 'place' ? 'Place' : 'Characters present'),
-      kind !== 'chars' && !q ? h('button', { class: 'pk-item', onclick: () => choose(null) }, h('span', { class: 'chk' }, !scene[kind] ? icon('check') : null), h('span', { class: 'nm', style: 'color:var(--muted)' }, 'None')) : null,
+      h('div', { class: 'pk-head' }, kind === 'pov' ? 'Point of view' : kind === 'place' ? 'Place' : kind === 'threads' ? 'Plot threads' : 'Characters present'),
+      !multi && !q ? h('button', { class: 'pk-item', onclick: () => choose(null) }, h('span', { class: 'chk' }, !scene[kind] ? icon('check') : null), h('span', { class: 'nm', style: 'color:var(--muted)' }, 'None')) : null,
       visible.map((x) => h('button', { class: 'pk-item', role: 'option', 'aria-selected': String(isSel(x)), onclick: () => choose(x) },
         h('span', { class: 'chk' }, isSel(x) ? icon('check') : null),
-        kind === 'place' ? h('span', { class: 'swatch sq', style: `--c:${x.color}` }) : h('span', { class: 'av', style: `--c:${x.color}` }, initials(x.name)),
+        kind === 'place' ? h('span', { class: 'swatch sq', style: `--c:${x.color}` }) : kind === 'threads' ? h('span', { class: 'swatch thr', style: `--c:${x.color}` }) : h('span', { class: 'av', style: `--c:${x.color}` }, initials(x.name)),
         h('span', { class: 'nm' }, x.name || '(unnamed)'))),
       q && !lib.some((x) => x.name.toLowerCase() === q) ? h('button', { class: 'pk-item add', onclick: create }, h('span', { class: 'chk' }, icon('plus')), h('span', { class: 'nm' }, `Add “${input.value.trim()}”`)) : null);
     hi = Math.max(0, Math.min(hi, opts().length - 1));
@@ -1244,9 +1290,38 @@ function openPicker(anchor, kind, scene) {
       e.preventDefault();
       const b = opts()[hi]; if (!b) return;
       b.click();
-      if (kind === 'chars' && pop) { input.value = ''; hi = 0; draw(); }
+      if (multi && pop) { input.value = ''; hi = 0; draw(); }
     }
   });
+  pop = h('div', { class: 'pop picker' }, input, list);
+  draw();
+  place(pop, anchor);
+  if (!TOUCH) input.focus();
+}
+
+function openFilterPicker(anchor) {
+  closePop();
+  const input = h('input', { class: 'pk-search', placeholder: 'Find a character, place or plot thread…', 'aria-label': 'Find' });
+  const list = h('div', { class: 'pk-list' });
+  const groups = [['thread', 'Plot threads', S.threads], ['char', 'Characters', S.characters], ['place', 'Places', S.places]];
+  const pick = (type, x) => { filter = { type, id: x.id }; if (S.ui.only == null) S.ui.only = true; closePop(); save(); renderAll(); };
+  const draw = () => {
+    const q = input.value.trim().toLowerCase();
+    setKids(list,
+      h('label', { class: 'pk-item pk-mode' }, h('input', { type: 'checkbox', checked: !!S.ui.only, onchange: (e) => { S.ui.only = e.target.checked; save(); if (filter) renderAll(); } }),
+        h('span', { class: 'nm' }, 'Hide scenes that don’t match')),
+      groups.map(([type, label, lib]) => {
+        const items = lib.filter((x) => x.name.toLowerCase().includes(q));
+        if (!items.length) return null;
+        return [h('div', { class: 'pk-head' }, label), items.map((x) => h('button', { class: 'pk-item', onclick: () => pick(type, x) },
+          h('span', { class: 'chk' }, filter && filter.id === x.id ? icon('check') : null),
+          type === 'char' ? h('span', { class: 'av', style: `--c:${x.color}` }, initials(x.name)) : h('span', { class: 'swatch' + (type === 'place' ? ' sq' : ' thr'), style: `--c:${x.color}` }),
+          h('span', { class: 'nm' }, x.name || '(unnamed)')))];
+      }),
+      !S.threads.length && !q ? h('div', { class: 'emptykid' }, 'No plot threads yet. Add them in the side list under Plot threads, or from a scene’s thread label.') : null);
+  };
+  input.addEventListener('input', draw);
+  input.addEventListener('keydown', (e) => { if (e.key === 'Escape') closePop(); if (e.key === 'Enter') { e.preventDefault(); list.querySelector('button.pk-item')?.click(); } });
   pop = h('div', { class: 'pop picker' }, input, list);
   draw();
   place(pop, anchor);
@@ -1429,7 +1504,7 @@ function openBackup() {
       }
       return n;
     };
-    const c = add(next.characters, S.characters), pl = add(next.places, S.places);
+    const c = add(next.characters, S.characters), pl = add(next.places, S.places) + add(next.threads, S.threads);
     const skipped = next.characters.length + next.places.length - c - pl;
     save(); scrim.remove(); renderAll();
     const parts = [c && `${c} character${c === 1 ? '' : 's'}`, pl && `${pl} place${pl === 1 ? '' : 's'}`].filter(Boolean).join(' and ');
@@ -1461,7 +1536,7 @@ function outlineMarkdown(opt) {
   const usage = new Map(), povs = new Map();
   walk(S.items, (n) => {
     if (n.type !== 'scene') return;
-    new Set([...n.chars, n.pov, n.place].filter(Boolean)).forEach((id) => usage.set(id, (usage.get(id) || 0) + 1));
+    new Set([...n.chars, ...n.threads, n.pov, n.place].filter(Boolean)).forEach((id) => usage.set(id, (usage.get(id) || 0) + 1));
     if (n.pov) povs.set(n.pov, (povs.get(n.pov) || 0) + 1);
   });
   const scenes = (k) => `${k} scene${k === 1 ? '' : 's'}`;
@@ -1490,6 +1565,11 @@ function outlineMarkdown(opt) {
     }
     out.push('');
   }
+  if (S.threads.length) {
+    out.push('## Plot threads', '');
+    for (const t of S.threads) out.push(`- **${t.name || '(unnamed)'}** (in ${scenes(usage.get(t.id) || 0)})${noteText(t.note)}`);
+    out.push('');
+  }
   if (S.places.length) {
     out.push('## Places', '');
     for (const p of S.places) out.push(`- **${p.name || '(unnamed)'}** (in ${scenes(usage.get(p.id) || 0)})${noteText(p.note)}`);
@@ -1500,11 +1580,13 @@ function outlineMarkdown(opt) {
     S.climate.forEach((w, i) => { if (w) out.push(`- ${MONTHS[i]}: ${w}`); });
     out.push('');
   }
-  out.push('## Outline', '');
+  const ft = filterTarget();
+  out.push(opt.onlyFilter && ft ? `## Outline (only scenes with ${ft.name}; scene numbers are from the full book)` : '## Outline', '');
   let num = 0, held = false;
   const list = (items, depth) => {
     for (const n of items) {
       if (n.type === 'section') {
+        if (opt.onlyFilter && !sectionMatches(n)) { if (!held) num += scenesIn(n); continue; }
         const t = n.title || 'Untitled section';
         out.push(depth < 4 ? `${'#'.repeat(depth + 3)} ${t}` : `**${t}**`, '');
         list(n.children, depth + 1);
@@ -1515,9 +1597,11 @@ function outlineMarkdown(opt) {
         out.push(`> **Time:** ${when || 'time passes'}${weather ? ` · Weather: ${weather}` : ''}`, '');
       } else if (n.type === 'scene') {
         if (!held) num++;
+        if (opt.onlyFilter && !sceneMatches(n)) continue;
         out.push(`**${held ? 'Held scene' : `Scene ${num}`}: ${n.title || 'Untitled scene'}**${opt.status ? ` · _${STATUS[n.status || 0]}_` : ''}`);
         const pov = charById(n.pov), pl = placeById(n.place);
-        const meta = [n.heat && `Intensity: ${n.heat}/5 (${HEAT[n.heat]})`, pov && `POV: ${pov.name}`, pl && `Place: ${pl.name}`, n.chars.length && `Present: ${names(n.chars)}`].filter(Boolean);
+        const ths = n.threads.map(threadById).filter(Boolean).map((t) => t.name).join(', ');
+        const meta = [ths && `Threads: ${ths}`, n.heat && `Intensity: ${n.heat}/5 (${HEAT[n.heat]})`, pov && `POV: ${pov.name}`, pl && `Place: ${pl.name}`, n.chars.length && `Present: ${names(n.chars)}`].filter(Boolean);
         if (meta.length) out.push(`- ${meta.join(' · ')}`);
         if (n.summary.trim()) out.push(`- Summary: ${n.summary.trim().replace(/\s*\n\s*/g, ' ')}`);
         if (opt.details && n.details.trim()) out.push('- Details:', indent(n.details, '    '));
@@ -1535,7 +1619,7 @@ function outlineMarkdown(opt) {
 }
 function openAiExport() {
   closePop();
-  const opt = { details: true, status: true, climate: true, holding: true };
+  const opt = { details: true, status: true, climate: true, holding: true, onlyFilter: !!filter };
   const ta = h('textarea', { id: 'ai-md', spellcheck: 'false', 'aria-label': 'Outline as text' });
   const words = h('span', { class: 'stat' });
   const refresh = () => { ta.value = outlineMarkdown(opt); words.textContent = `${ta.value.split(/\s+/).length.toLocaleString()} words`; };
@@ -1545,7 +1629,7 @@ function openAiExport() {
     h('div', { class: 'modal', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'ai-h' },
       h('h2', { id: 'ai-h' }, 'Share with AI'),
       h('p', null, 'A plain-text version of your outline with names written out, so an AI can follow it easily. Copy it and paste it into a chat, then ask your question underneath. This is for reading only; use Backup to save or restore.'),
-      h('div', { class: 'btns' }, box('details', 'Scene details'), box('status', 'Status'), box('climate', 'Weather table'), box('holding', 'Holding scenes')),
+      h('div', { class: 'btns' }, box('details', 'Scene details'), box('status', 'Status'), box('climate', 'Weather table'), box('holding', 'Holding scenes'), filter && filterTarget() ? box('onlyFilter', `Only scenes with ${filterTarget().name}`) : null),
       ta,
       h('div', { class: 'btns' },
         h('button', { class: 'btn primary', onclick: async () => {

@@ -12,11 +12,13 @@ Open `index.html` in any modern browser. There's nothing to install or build.
 - **Time markers** between scenes (e.g. "1 month into classes" + Oct). Pick a month and the marker shows that month's typical weather from your **Climate by month** table. Type your own weather to override it.
 - **Library** (left rail): characters and places. Click a character to open their profile: title, age, group, track, appearance, power, power growth (start → end), personality, backstory, relationships and other notes. Empty fields are hidden when viewing; **Edit** shows every field with a hint, plus rename and delete. Places have a name, colour and description. Each row shows a scene count, and a filter button that highlights every scene they appear in.
 - **Intensity heatmap**: click the coloured edge on the left of a scene to rate it 1–5, from Calm (blue) through Uneasy (green), Tense (yellow) and Intense (orange) to Critical (red). The **Heatmap** button turns the colours and the *Intensity flow* chart on or off; click a bar in the chart to jump to that scene.
+- **Plot threads**: name your threads in the side list (or type a new one from a scene's thread label) and tag scenes with as many as apply. An open scene shows its threads as chips; tap one to see just that thread.
+- **Filter** (top bar): pick any character, place or plot thread. **Show only** hides everything else (including sections with no matching scenes); **Dim others** keeps the whole outline visible and fades what doesn't match.
 - **Status dot** on each scene: planned, drafted or done.
 - **View** buttons along the top: **Collapse all** (section headings only), **Titles** (every scene as a one-line title), **Descriptions** (titles plus short descriptions) and **Everything** (descriptions and details).
 - **Drag** the ⠿ handle to reorder. Drop onto a section heading to move a scene into it. The ⋯ menu has Move up/down, **Move to…** (pick any section, works on phones and tablets), Move to holding, Duplicate, Delete and Add below.
 - **Holding** sits below the outline for scenes you've set aside but might use later. Held scenes aren't numbered, counted or shown in the intensity flow. Move them back with Move to… or by dragging.
-- **Share with AI** turns your outline into plain text with names written out, ready to paste into an AI chat. You can leave out scene details, status or the weather table.
+- **Share with AI** turns your outline into plain text with names written out, ready to paste into an AI chat. You can leave out scene details, status or the weather table, or, while a filter is on, share only the matching scenes.
 - **Search** (`/`) and **Undo** (Ctrl/⌘+Z) for structural changes.
 
 ## Starting your own book
