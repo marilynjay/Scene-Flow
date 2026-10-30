@@ -23,6 +23,12 @@ Open `index.html` in any modern browser. There's nothing to install or build.
 
 The app opens with an example book. Click **Start my own book** in the banner at the top, or **Backup → Start a new, empty book** at any time. Loading your own file with **Backup → Open file… → Replace outline with this** also replaces the example.
 
+## Saving to your phone's home screen
+
+Open the site in Safari (iPhone/iPad) and tap **Share → Add to Home Screen**, or in Chrome (Android) tap **⋮ → Add to Home screen**. It opens full screen with its own icon.
+
+On iPhone and iPad the home-screen app keeps its own saved copy, separate from Safari. To move an outline you started in Safari, use **Backup → Copy** there, then **Backup**, paste, and **Replace** in the home-screen app.
+
 ## Saving
 
 Everything saves automatically to your browser's local storage on this device. Use **Backup** to copy or download your outline as a file now and then, and to restore it on another device. **Add new characters & places** in the same window brings in only the characters and places from a file that aren't in your list yet, leaving your scenes and existing notes alone.

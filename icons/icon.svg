@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#34599a"/>
+      <stop offset="1" stop-color="#1c3260"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <g transform="translate(256 285) scale(1.16) translate(-256 -285)">
+  <!-- page block edges -->
+  <path d="M256 186 C206 166 146 164 100 176 L100 382 C146 370 206 372 256 392 C306 372 366 370 412 382 L412 176 C366 164 306 166 256 186 Z" fill="#c8bea8"/>
+  <!-- pages -->
+  <path d="M256 172 C210 152 150 150 108 162 L108 364 C150 352 210 354 256 374 Z" fill="#f6f1e6"/>
+  <path d="M256 172 C302 152 362 150 404 162 L404 364 C362 352 302 354 256 374 Z" fill="#fbf8f1"/>
+  <path d="M256 172 L256 374" stroke="#d9cfba" stroke-width="3"/>
+  <!-- left page: text lines -->
+  <g fill="#cfc6b3">
+    <rect x="132" y="196" width="90" height="9" rx="4.5" fill="#9fa9bf"/>
+    <rect x="132" y="224" width="100" height="6" rx="3"/>
+    <rect x="132" y="244" width="94" height="6" rx="3"/>
+    <rect x="132" y="264" width="100" height="6" rx="3"/>
+    <rect x="132" y="284" width="80" height="6" rx="3"/>
+    <rect x="132" y="312" width="100" height="6" rx="3"/>
+    <rect x="132" y="332" width="66" height="6" rx="3"/>
+  </g>
+  <!-- right page: scene rows in intensity colours -->
+  <g>
+    <rect x="302" y="196" width="12" height="12" rx="3" fill="#3f7fd0"/>
+    <rect x="322" y="199" width="60" height="6" rx="3" fill="#cfc6b3"/>
+    <rect x="302" y="226" width="12" height="12" rx="3" fill="#3fa35a"/>
+    <rect x="322" y="229" width="52" height="6" rx="3" fill="#cfc6b3"/>
+    <rect x="302" y="256" width="12" height="12" rx="3" fill="#e0b822"/>
+    <rect x="322" y="259" width="58" height="6" rx="3" fill="#cfc6b3"/>
+    <rect x="302" y="286" width="12" height="12" rx="3" fill="#e9822c"/>
+    <rect x="322" y="289" width="46" height="6" rx="3" fill="#cfc6b3"/>
+    <rect x="302" y="316" width="12" height="12" rx="3" fill="#d2402f"/>
+    <rect x="322" y="319" width="56" height="6" rx="3" fill="#cfc6b3"/>
+  </g>
+  <!-- ribbon bookmark -->
+  <path d="M268 150 L288 150 L288 420 L278 408 L268 420 Z" fill="#d2402f"/>
+  <path d="M268 150 L288 150 L288 168 L268 172 Z" fill="#a8301f"/>
+  </g>
+</svg>
