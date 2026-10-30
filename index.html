@@ -70,6 +70,7 @@
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
 html, body { height: 100%; }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 body {
   margin: 0; background: var(--bg); color: var(--fg);
   font: 400 var(--fs)/1.35 var(--ui);
@@ -250,6 +251,8 @@ textarea.ssum::placeholder { color: var(--faint); }
 textarea.sdetails { max-width: 80ch; }
 .view-note { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; color: var(--muted); font-size: var(--fs-s); padding: 2px 4px 6px; }
 .view-note button { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
+.seg .sm { display: none; }
+@media (max-width: 600px) { .seg .lg { display: none; } .seg .sm { display: inline; } .seg button { padding: 0 7px; } }
 .seg button.on { background: var(--accent-soft); color: var(--accent); }
 .kids { display: flex; flex-direction: column; gap: 3px; margin: 1px 0 4px 9px; padding-left: 10px; border-left: 1px solid var(--line); }
 .emptykid { color: var(--faint); font-size: var(--fs-s); padding: 3px 4px; }
@@ -901,7 +904,7 @@ function renderTree() {
   const frag = document.createDocumentFragment();
   renderList(S.items, frag, 0, nums);
   root.replaceChildren(frag);
-  if (S.ui.scenesHidden && S.items.length) root.prepend(h('div', { class: 'view-note' }, icon('eye'), `Scenes are hidden (${S.items.length ? (() => { let k = 0; walk(S.items, (x) => { if (x.type === 'scene') k++; }); return k; })() : 0}). `,
+  if (S.ui.scenesHidden && S.items.length) root.prepend(h('div', { class: 'view-note' }, icon('eye'), S.ui.headingsOnly ? 'Showing section titles only. ' : `Scenes are hidden (${(() => { let k = 0; walk(S.items, (x) => { if (x.type === 'scene') k++; }); return k; })()}). `,
     h('button', { onclick: () => setLevel(1) }, 'Show scene titles')));
   if (!S.items.length) root.append(h('div', { class: 'emptykid' }, 'Nothing here yet. Start with a section (like “Part One” or “Arrival day”) or a scene below.'));
   else if (hiding() && !root.querySelector('.scene')) root.append(h('div', { class: 'emptykid' }, 'No scenes match this filter yet.'));
@@ -960,6 +963,7 @@ function openHeat(anchor, scene) {
 function renderList(list, into, depth, nums) {
   for (const n of list) {
     if (S.ui.scenesHidden && n.type === 'scene') continue;
+    if (S.ui.headingsOnly && n.type === 'time') continue;
     if (hiding() && ((n.type === 'scene' && !sceneMatches(n)) || (n.type === 'section' && !sectionMatches(n)))) continue;
     if (n.type === 'section') into.append(renderSection(n, depth, nums));
     else if (n.type === 'scene') into.append(renderScene(n, nums.get(n.id)));
@@ -979,6 +983,7 @@ function dotsBtn(n) {
 
 const describing = new Set();   // sections showing an empty description box
 function describeSection(n) {
+  if (S.ui.headingsOnly) { S.ui.headingsOnly = false; renderBar(); }
   describing.add(n.id); renderTree();
   const f = () => $(`[data-id="${n.id}"] > .sec-body textarea.ssum`)?.focus(); f(); setTimeout(f);
 }
@@ -1005,7 +1010,7 @@ function renderSection(n, depth, nums) {
       h('button', { onclick: add('section'), title: 'Add a sub-section' }, '+ Section')),
     dotsBtn(n));
   const node = h('div', { class: `node section d${Math.min(depth, 3)}${anyMatch ? '' : ' dim'}`, 'data-id': n.id }, row);
-  if (n.summary || n.details || describing.has(n.id)) {
+  if ((n.summary || n.details || describing.has(n.id)) && !S.ui.headingsOnly) {
     const wc = words(n.details);
     const sum = area('ssum', n.summary, 'What happens in this section, in a sentence or two…', (v) => { n.summary = v; });
     sum.addEventListener('blur', () => { if (!n.summary.trim() && !n.details.trim() && describing.delete(n.id)) renderTree(); });
@@ -1301,8 +1306,9 @@ function renderTime(n) {
 /* ================= toolbar ================= */
 function renderBar() {
   const bar = $('#bar');
-  const levels = [['Sections', 0, 'Show every section and its description, with scenes hidden'], ['Titles', 1, 'Open every section and show scene titles only'],
-    ['Descriptions', 2, 'Show each scene’s short description'], ['Everything', 3, 'Show descriptions and details']];
+  const levels = [['Headings', -1, 'Section titles only', 'Headings'], ['Sections', 0, 'Every section and its description, with scenes hidden', 'Sections'],
+    ['Titles', 1, 'Open every section and show scene titles only', 'Titles'], ['Descriptions', 2, 'Show each scene’s short description', 'Desc.'], ['Everything', 3, 'Show descriptions and details', 'All']];
+  const activeLevel = S.ui.headingsOnly ? -1 : S.ui.scenesHidden ? 0 : null;
   const fl = filterTarget();
   const searchInput = h('input', { id: 'q', type: 'search', placeholder: 'Search scenes  /', value: query, 'aria-label': 'Search scenes',
     oninput: (e) => { query = e.target.value.trim(); renderTree(); } });
@@ -1319,7 +1325,8 @@ function renderBar() {
       : h('button', { class: 'tb', title: 'Show scenes with a character, place or plot thread', onclick: (e) => openFilterPicker(e.currentTarget) }, icon('filter'), 'Filter'),
     h('span', { class: 'spacer' }),
     h('span', { class: 'seg-label' }, 'View'),
-    h('span', { class: 'seg', role: 'group', 'aria-label': 'Expand outline to' }, levels.map(([label, l, tip]) => h('button', { title: tip, class: l === 0 && S.ui.scenesHidden ? 'on' : null, 'aria-pressed': l === 0 ? String(!!S.ui.scenesHidden) : null, onclick: () => setLevel(l) }, label))),
+    h('span', { class: 'seg', role: 'group', 'aria-label': 'Expand outline to' }, levels.map(([label, l, tip, short]) => h('button', { title: tip, class: l === activeLevel ? 'on' : null, 'aria-pressed': l <= 0 ? String(l === activeLevel) : null, 'aria-label': label, onclick: () => setLevel(l) },
+      h('span', { class: 'lg' }, label), h('span', { class: 'sm' }, short)))),
     h('button', { class: 'tb', title: 'Every to-do and open question in the book', 'aria-label': 'To-dos and questions', onclick: openQuestions },
       icon('pen'), h('span', { class: 'lbl' }, 'To-dos'), totalOpen() ? h('span', { class: 'qcount' }, totalOpen()) : null),
     h('button', { class: 'tb' + (S.ui.heat ? ' on' : ''), title: 'Show or hide intensity colours and the flow chart', 'aria-pressed': String(!!S.ui.heat),
@@ -1337,9 +1344,10 @@ function renderStat() {
   const held = scenesIn(S.holding);
   el.textContent = filtering() ? `${match}/${total} scenes` : `${total} scenes · ${done} done${held ? ` · ${held} held` : ''}`;
 }
-// Level 0 is the Sections view: every section open with its description, scenes hidden.
+// Level -1 shows section titles only; 0 is the Sections view (descriptions and time markers, no scenes).
 function setLevel(l) {
-  S.ui.scenesHidden = l === 0;
+  S.ui.scenesHidden = l <= 0;
+  S.ui.headingsOnly = l === -1;
   walk(everything(), (n) => {
     if (n.type === 'section') n.collapsed = false;
     if (n.type === 'scene' && l > 0) n.open = l - 1;
@@ -1770,7 +1778,7 @@ function focusNew(id) {
     if (el) { el.focus(); el.scrollIntoView({ block: 'nearest' }); }
   });
 }
-function showScenesFor(type) { if (type === 'scene' && S.ui.scenesHidden) { S.ui.scenesHidden = false; renderBar(); } }
+function showScenesFor(type) { if (type === 'scene' && S.ui.scenesHidden) { S.ui.scenesHidden = false; S.ui.headingsOnly = false; renderBar(); } }
 function addInside(sec, type) { showScenesFor(type); snapshot(); const x = newOf(type); sec.children.push(x); sec.collapsed = false; save(); renderAll(); focusNew(x.id); }
 function addAfter(n, type) { showScenesFor(type); snapshot(); const hit = find(n.id); const x = newOf(type); hit.list.splice(hit.list.indexOf(n) + 1, 0, x); save(); renderAll(); focusNew(x.id); }
 function addRoot(type) { showScenesFor(type); snapshot(); const x = newOf(type); S.items.push(x); save(); renderAll(); focusNew(x.id); }
@@ -2097,6 +2105,21 @@ if (/iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'Mac
   const vp = document.querySelector('meta[name="viewport"]');
   if (vp && !/maximum-scale/.test(vp.content)) vp.content += ', maximum-scale=1';
 }
+
+// When a newer version of the app is published, offer to reload instead of running a stale saved copy.
+const APP_VERSION = '2026-10-30.2';
+async function checkForUpdate() {
+  if (!/github\.io$/.test(location.hostname)) return;
+  try {
+    const html = await (await fetch(location.pathname + '?check=' + Date.now(), { cache: 'no-store' })).text();
+    const latest = (html.match(/APP_VERSION = '([^']+)'/) || [])[1];
+    if (!latest || latest === APP_VERSION || $('#update-bar')) return;
+    document.body.append(h('div', { id: 'update-bar', class: 'toast', role: 'status' }, 'A new version of Scene Flow is ready.',
+      h('button', { onclick: () => { flush(); location.replace(location.pathname + '?v=' + encodeURIComponent(latest)); } }, 'Reload')));
+  } catch (e) { /* offline: try again next time */ }
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden) checkForUpdate(); });
+setTimeout(checkForUpdate, 1500);
 
 S = load();
 railOpen = !matchMedia('(max-width: 760px)').matches;

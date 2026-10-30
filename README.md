@@ -17,7 +17,7 @@ Open `index.html` in any modern browser. There's nothing to install or build.
 - **To-dos & questions**: give any scene a checklist (⋯ → Add to-do or question, or + To-do or question under its description). Items ending in “?” become questions; tap an item's icon to switch. Scenes with open items show a badge, and the **To-dos** button lists everything. **Changes across scenes** are one to-do tagged on many scenes (“Move the first day to Monday”): pick scenes by searching their text, tick each scene off as you revise it, watch the progress, and tap **Show** to filter the outline to the scenes still left.
 - **Status dot** on each scene: planned, drafted or done.
 - **Section descriptions**: give any section a short description (+ Description on its heading, or ⋯ → Add description) and optional Details. The description stays visible under the heading even when the section is folded.
-- **View** buttons along the top: **Sections** (every section and its description, with scenes hidden), **Titles** (every scene as a one-line title), **Descriptions** (titles plus short descriptions) and **Everything** (descriptions and details).
+- **View** buttons along the top: **Headings** (section titles only), **Sections** (every section and its description, with scenes hidden), **Titles** (every scene as a one-line title), **Descriptions** (titles plus short descriptions) and **Everything** (descriptions and details).
 - **Drag** the ⠿ handle to reorder. Drop onto a section heading to move a scene into it. The ⋯ menu has Move up/down, **Move to…** (pick any section, works on phones and tablets), Move to holding, Duplicate, Delete and Add below.
 - **Holding** sits below the outline for scenes you've set aside but might use later. Held scenes aren't numbered, counted or shown in the intensity flow. Move them back with Move to… or by dragging.
 - **Share with AI** turns your outline into plain text with names written out, ready to paste into an AI chat. You can leave out scene details, status or the weather table, or, while a filter is on, share only the matching scenes.
@@ -26,6 +26,10 @@ Open `index.html` in any modern browser. There's nothing to install or build.
 ## Starting your own book
 
 The app opens with an example book. Click **Start my own book** in the banner at the top, or **Backup → Start a new, empty book** at any time. Loading your own file with **Backup → Open file… → Replace outline with this** also replaces the example.
+
+## Updates
+
+When a new version is published, the app shows **A new version of Scene Flow is ready → Reload**. Your outline is saved first.
 
 ## Saving to your phone's home screen
 
