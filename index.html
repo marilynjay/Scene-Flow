@@ -1534,31 +1534,51 @@ function openBackup() {
     if (!newArmed) { newArmed = true; newBtn.textContent = 'Click again to clear everything'; return; }
     newBook();
   } }, 'Start a new, empty book');
-  const mergeBtn = h('button', { class: 'btn', title: 'Adds characters and places whose names aren’t in your list yet. Scenes and everything else stay as they are.', onclick: () => {
+  const mergeBtn = h('button', { class: 'btn', title: 'Adds what’s new in the file: characters, places and plot threads not in your lists yet, and its sections and scenes at the end of your outline. Nothing you already have is changed or removed.', onclick: () => {
     let next;
     try { next = normalize(JSON.parse(ta.value)); } catch (err) { toast('That text isn’t a valid backup. Paste the full text you copied, starting with {'); return; }
     snapshot();
+    // People, places and threads are matched by name, so the file's scenes point at the ones already in your lists.
+    const idMap = new Map();
     const add = (from, into) => {
-      const have = new Set(into.map((x) => x.name.trim().toLowerCase()));
+      const byName = new Map(into.map((x) => [x.name.trim().toLowerCase(), x.id]));
       const ids = new Set(into.map((x) => x.id));
       let n = 0;
       for (const x of from) {
-        if (have.has(x.name.trim().toLowerCase())) continue;
-        into.push(Object.assign(JSON.parse(JSON.stringify(x)), { id: ids.has(x.id) ? uid() : x.id }));
+        const have = byName.get(x.name.trim().toLowerCase());
+        if (have) { idMap.set(x.id, have); continue; }
+        const copy = Object.assign(JSON.parse(JSON.stringify(x)), { id: ids.has(x.id) ? uid() : x.id });
+        into.push(copy); idMap.set(x.id, copy.id); ids.add(copy.id); byName.set(copy.name.trim().toLowerCase(), copy.id);
         n++;
       }
       return n;
     };
-    const c = add(next.characters, S.characters), pl = add(next.places, S.places) + add(next.threads, S.threads);
-    const skipped = next.characters.length + next.places.length - c - pl;
+    const c = add(next.characters, S.characters), pl = add(next.places, S.places), th = add(next.threads, S.threads);
+    const bring = (list) => list.map((n) => {
+      const copy = JSON.parse(JSON.stringify(n));
+      walk([copy], (x) => {
+        x.id = uid();
+        if (x.type !== 'scene') return;
+        x.pov = idMap.get(x.pov) || null; x.place = idMap.get(x.place) || null;
+        x.chars = x.chars.map((id) => idMap.get(id)).filter(Boolean);
+        x.threads = x.threads.map((id) => idMap.get(id)).filter(Boolean);
+      });
+      return copy;
+    });
+    let sc = 0;
+    walk([...next.items, next.holding], (x) => { if (x.type === 'scene') sc++; });
+    S.items.push(...bring(next.items));
+    S.holding.children.push(...bring(next.holding.children));
+    if (sc) S.sample = false;
     save(); scrim.remove(); renderAll();
-    const parts = [c && `${c} character${c === 1 ? '' : 's'}`, pl && `${pl} place${pl === 1 ? '' : 's'}`].filter(Boolean).join(' and ');
-    toast(`${parts ? `Added ${parts}` : 'Nothing new to add'}${skipped ? ` · ${skipped} already in your list` : ''}`, parts ? 'Undo' : null, undo);
-  } }, 'Add new characters & places');
+    const plural = (k, w) => `${k} ${w}${k === 1 ? '' : 's'}`;
+    const parts = [sc && plural(sc, 'scene'), c && plural(c, 'character'), pl && plural(pl, 'place'), th && plural(th, 'plot thread')].filter(Boolean);
+    toast(parts.length ? `Added ${parts.join(', ')}` : 'Nothing new to add', parts.length ? 'Undo' : null, undo);
+  } }, 'Add from file');
   const scrim = h('div', { class: 'scrim', onclick: (e) => { if (e.target === scrim) scrim.remove(); } },
     h('div', { class: 'modal', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'bk-h' },
       h('h2', { id: 'bk-h' }, 'Back up your outline'),
-      h('p', null, 'Your outline saves automatically in this browser only. Copy this text or download it somewhere safe now and then. To restore, paste a backup here or open a saved file, then replace. To bring in only new characters and places without touching your scenes, use Add new characters & places.'),
+      h('p', null, 'Your outline saves automatically in this browser only. Copy this text or download it somewhere safe now and then. To restore, paste a backup here or open a saved file, then replace. To add a file’s scenes, characters, places and threads to what you already have, without changing or removing anything, use Add from file.'),
       ta,
       h('div', { class: 'btns' },
         h('button', { class: 'btn primary', onclick: async () => {

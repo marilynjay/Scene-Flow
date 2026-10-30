@@ -33,4 +33,4 @@ On iPhone and iPad the home-screen app keeps its own saved copy, separate from S
 
 ## Saving
 
-Everything saves automatically to your browser's local storage on this device. Use **Backup** to copy or download your outline as a file now and then, and to restore it on another device. **Add new characters & places** in the same window brings in only the characters and places from a file that aren't in your list yet, leaving your scenes and existing notes alone.
+Everything saves automatically to your browser's local storage on this device. Use **Backup** to copy or download your outline as a file now and then, and to restore it on another device. **Add from file** in the same window adds what a file has that you don't: characters, places and plot threads not in your lists yet (matched by name), plus its sections and scenes at the end of your outline. Nothing you already have is changed or removed.
