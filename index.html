@@ -1611,30 +1611,33 @@ function openPicker(anchor, kind, scene) {
   };
   let visible = [], hi = 0;
   // Cast and threads open on who/what is already in the scene; the full list is one tap away.
-  let adding = !multi || !scene[kind].length;
+  // POV and place open on the current choice too, with Change to see the full list.
+  const chosen = () => (multi ? scene[kind] : scene[kind] ? [scene[kind]] : []);
+  let adding = !chosen().length;
   const startAdding = () => { adding = true; input.hidden = false; hi = 0; draw(); if (!TOUCH) input.focus(); };
-  const libType = kind === 'threads' ? 'thread' : 'char';
-  const sceneCount = (id) => { let k = 0; walk(S.items, (n) => { if (n.type === 'scene' && (n.chars.includes(id) || n.threads.includes(id) || n.pov === id)) k++; }); return k; };
+  const libType = kind === 'threads' ? 'thread' : kind === 'place' ? 'place' : 'char';
+  const sceneCount = (id) => { let k = 0; walk(S.items, (n) => { if (n.type === 'scene' && (n.chars.includes(id) || n.threads.includes(id) || n.pov === id || n.place === id)) k++; }); return k; };
   const badge = (x) => kind === 'place' ? h('span', { class: 'swatch sq', style: `--c:${x.color}` }) : kind === 'threads' ? h('span', { class: 'swatch thr', style: `--c:${x.color}` }) : h('span', { class: 'av', style: `--c:${x.color}` }, initials(x.name));
   const opts = () => [...list.querySelectorAll('.pk-item')];
   const mark = () => opts().forEach((b, i) => b.classList.toggle('kb', i === hi));
   // Names that start with what was typed come first, then a later word that starts with it, then anything containing it.
   const rank = (x, q) => { const n = x.name.toLowerCase(); return n.startsWith(q) ? 0 : n.split(/[\s(]+/).some((w) => w.startsWith(q)) ? 1 : 2; };
   const draw = () => {
-    if (multi && !adding) {
+    if (!adding) {
       input.hidden = true;
-      const here = scene[kind].map((id) => lib.find((x) => x.id === id)).filter(Boolean);
+      const here = chosen().map((id) => lib.find((x) => x.id === id)).filter(Boolean);
       setKids(list,
-        h('div', { class: 'pk-head' }, `${kind === 'threads' ? 'Plot threads' : 'In this scene'} · ${here.length}`),
+        h('div', { class: 'pk-head' }, multi ? `${kind === 'threads' ? 'Plot threads' : 'In this scene'} · ${here.length}` : kind === 'pov' ? 'Point of view' : 'Place'),
         here.map((x) => h('div', { class: 'pk-row' },
           badge(x),
           h('button', { class: 'pk-name', title: `Open ${x.name || 'details'}`, onclick: () => openDetails(x, libType, sceneCount(x.id)) }, x.name || '(unnamed)'),
           kind === 'chars' && scene.pov === x.id ? h('span', { class: 'pk-tag', title: 'Point of view' }, 'POV') : null,
-          h('button', { class: 'ib pk-x', title: 'Remove from this scene', 'aria-label': `Remove ${x.name}`, onclick: () => {
-            snapshot(); scene[kind] = scene[kind].filter((id) => id !== x.id); save(); renderTree(); renderRail();
-            if (!scene[kind].length) startAdding(); else draw();
+          h('button', { class: 'ib pk-x', title: multi ? 'Remove from this scene' : 'Clear', 'aria-label': `Remove ${x.name}`, onclick: () => {
+            snapshot(); if (multi) scene[kind] = scene[kind].filter((id) => id !== x.id); else scene[kind] = null; save(); renderTree(); renderRail();
+            if (!chosen().length) startAdding(); else draw();
           } }, icon('x')))),
-        h('button', { class: 'pk-item add', onclick: startAdding }, h('span', { class: 'chk' }, icon('plus')), h('span', { class: 'nm' }, kind === 'threads' ? 'Add plot threads' : 'Add characters')));
+        h('button', { class: 'pk-item add', onclick: startAdding }, h('span', { class: 'chk' }, icon(multi ? 'plus' : 'right')),
+          h('span', { class: 'nm' }, kind === 'threads' ? 'Add plot threads' : kind === 'chars' ? 'Add characters' : kind === 'pov' ? 'Change POV' : 'Change place')));
       hi = 0; mark();
       return;
     }
@@ -1642,7 +1645,7 @@ function openPicker(anchor, kind, scene) {
     visible = lib.filter((x) => x.name.toLowerCase().includes(q));
     if (q) visible.sort((a, b) => rank(a, q) - rank(b, q));
     setKids(list, 
-      multi && scene[kind].length ? h('button', { class: 'pk-back', onclick: () => { adding = false; input.value = ''; draw(); } }, '‹ ', kind === 'threads' ? 'Back to this scene’s threads' : 'Back to who’s in this scene') : null,
+      chosen().length ? h('button', { class: 'pk-back', onclick: () => { adding = false; input.value = ''; draw(); } }, '‹ ', kind === 'threads' ? 'Back to this scene’s threads' : kind === 'chars' ? 'Back to who’s in this scene' : 'Back') : null,
       h('div', { class: 'pk-head' }, kind === 'pov' ? 'Point of view' : kind === 'place' ? 'Place' : kind === 'threads' ? 'Plot threads' : 'Characters present'),
       !multi && !q ? h('button', { class: 'pk-item', onclick: () => choose(null) }, h('span', { class: 'chk' }, !scene[kind] ? icon('check') : null), h('span', { class: 'nm', style: 'color:var(--muted)' }, 'None')) : null,
       visible.map((x) => h('button', { class: 'pk-item', role: 'option', 'aria-selected': String(isSel(x)), onclick: () => choose(x) },
@@ -2109,7 +2112,7 @@ if (/iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'Mac
 }
 
 // When a newer version of the app is published, offer to reload instead of running a stale saved copy.
-const APP_VERSION = '2026-10-30.3';
+const APP_VERSION = '2026-10-30.4';
 async function checkForUpdate() {
   if (!/github\.io$/.test(location.hostname)) return;
   try {
