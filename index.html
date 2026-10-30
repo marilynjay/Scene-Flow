@@ -240,11 +240,10 @@ main {
 .row:hover .acts, .row:focus-within .acts { opacity: 1; }
 .acts button { height: 18px; padding: 0 5px; border-radius: 3px; color: var(--muted); font-size: var(--fs-s); white-space: nowrap; }
 .acts button:hover { background: var(--accent-soft); color: var(--accent); }
-.sec-body { display: flex; flex-direction: column; gap: 3px; padding: 0 8px 4px 38px; }
-.section.d0 > .sec-body { padding-left: 40px; }
+.sec-body { display: flex; flex-direction: column; gap: 1px; padding: 0 8px 3px 34px; margin-top: -2px; }
 textarea.ssum { display: block; width: 100%; resize: none; overflow: hidden; border: 1px solid transparent; border-radius: 3px; background: none; padding: 2px 5px; margin: 0; outline: 0; field-sizing: content; min-height: 22px;
-  font: italic 400 12.5px/1.5 var(--book); color: var(--muted); max-width: 80ch; }
-.section.d0 > .sec-body textarea.ssum { font-size: 13px; color: var(--fg); }
+  font: italic 400 12px/1.45 var(--book); color: var(--muted); max-width: 80ch; }
+.section.d0 > .sec-body textarea.ssum { color: var(--fg); }
 textarea.ssum:hover { border-color: var(--line); }
 textarea.ssum::placeholder { color: var(--faint); }
 .sec-body .more { color: var(--faint); }
@@ -252,7 +251,6 @@ textarea.sdetails { max-width: 80ch; }
 .view-note { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; color: var(--muted); font-size: var(--fs-s); padding: 2px 4px 6px; }
 .view-note button { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
 .seg button.on { background: var(--accent-soft); color: var(--accent); }
-@media (hover: none) { textarea.ssum { font-size: 16px; } }
 .kids { display: flex; flex-direction: column; gap: 3px; margin: 1px 0 4px 9px; padding-left: 10px; border-left: 1px solid var(--line); }
 .emptykid { color: var(--faint); font-size: var(--fs-s); padding: 3px 4px; }
 .emptykid button { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
@@ -315,7 +313,6 @@ textarea::placeholder { color: var(--faint); }
 .todo-add { display: flex; align-items: center; gap: 6px; height: 24px; color: var(--time); padding-left: 1px; }
 .todo-add input { flex: 1; min-width: 0; border: 0; background: none; outline: 0; font-size: 12.5px; color: var(--fg); }
 .todo-add input::placeholder { color: color-mix(in srgb, var(--time) 60%, var(--muted)); }
-@media (hover: none) { .todo-add input, .todo .ed { font-size: 16px; } }
 .qlist { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding: 2px; }
 .qgroup { display: flex; flex-direction: column; gap: 4px; }
 .qlist .todos-h { display: none; }
@@ -388,6 +385,11 @@ html { touch-action: manipulation; }
 .time select { height: 18px; border: 1px solid color-mix(in srgb, var(--time) 35%, transparent); border-radius: 3px; background: var(--panel); color: var(--time); font: 500 10.5px var(--mono); padding: 0 2px; flex: none; }
 .time .sep { color: color-mix(in srgb, var(--time) 50%, transparent); }
 .time.dim { opacity: .45; }
+.time.slim > .row { background: none; border: 0; min-height: 18px; margin: 0; padding: 0 4px 0 6px; gap: 5px; color: color-mix(in srgb, var(--time) 75%, var(--muted)); font-size: var(--fs-s); }
+.time.slim > .row::after { content: ""; flex: 1; border-top: 1px dashed color-mix(in srgb, var(--time) 30%, transparent); margin-left: 4px; }
+.time.slim svg.i { width: 11px; height: 11px; }
+.time.slim .tl { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.time.slim .tm { font: 400 10px var(--mono); opacity: .8; }
 
 /* intensity heatmap */
 .scene { position: relative; }
@@ -1279,6 +1281,9 @@ function plaques(n) {
 
 function renderTime(n) {
   const clim = n.month ? S.climate[n.month - 1] : '';
+  // In the Sections view a time marker is a slim divider; it's edited in the other views.
+  if (S.ui.scenesHidden) return h('div', { class: 'node time slim', 'data-id': n.id, title: [n.label, n.month ? MONTHS[n.month - 1] : '', n.weather || clim].filter(Boolean).join(' · ') },
+    h('div', { class: 'row' }, icon('clock'), h('span', { class: 'tl' }, n.label || 'Time passes'), n.month ? h('span', { class: 'tm' }, MONTHS[n.month - 1]) : null));
   const sel = h('select', { title: 'Month (fills in typical weather from your climate table)', 'aria-label': 'Month',
     onchange: (e) => { n.month = +e.target.value; save(); renderTree(); } },
     h('option', { value: 0 }, '—'), MONTHS.map((m, i) => h('option', { value: i + 1, selected: n.month === i + 1 }, m)));
