@@ -157,6 +157,30 @@ main {
 .details-name { flex: 1; min-width: 0; font: 600 15px/1.2 var(--book); border: 1px solid transparent; border-radius: 4px; background: none; padding: 4px 6px; outline: 0; }
 .details-name:hover { border-color: var(--line); }
 .details-name:focus { border-color: var(--accent); background: var(--bg); }
+.profile { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; padding: 2px 2px 8px; }
+.details-name.ro { cursor: default; }
+.details-name.ro:hover { border-color: transparent; }
+.pf-top { display: flex; flex-direction: column; gap: 6px; }
+.pf-alias { font: italic 400 14px/1.3 var(--book); color: var(--accent); }
+.pf-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.pf-chip { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border-radius: 11px; background: var(--hover); border: 1px solid var(--line); font-size: 12px; color: var(--fg); }
+.pf-sec { display: flex; flex-direction: column; gap: 4px; }
+.pf-sec h3, .pf-label, .pf-k { margin: 0; font: 600 10.5px/1.2 var(--ui); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+.pf-text { white-space: pre-wrap; overflow-wrap: anywhere; font: 400 13px/1.55 var(--book); color: var(--fg); max-width: 70ch; }
+.pf-arc { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 8px; align-items: stretch; }
+.pf-card { display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); }
+.pf-card .pf-text { font-size: 12.5px; }
+.pf-arrow { align-self: center; color: var(--faint); font-size: 16px; }
+.pf-empty { color: var(--muted); font-size: 13px; }
+.pf-empty button { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
+.pf-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 12px; }
+.pf-field { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.pf-field input, .pf-ta { width: 100%; border: 1px solid var(--line); border-radius: 4px; background: var(--bg); padding: 5px 7px; outline: 0; font: 400 13px/1.45 var(--ui); color: var(--fg); }
+.modal .pf-ta { height: auto; resize: none; overflow: hidden; field-sizing: content; min-height: 34px; font: 400 13px/1.5 var(--ui); padding: 5px 7px; }
+.pf-field input:focus, .pf-ta:focus { border-color: var(--accent); background: var(--panel); }
+.pf-field input::placeholder, .pf-ta::placeholder { color: var(--faint); }
+@media (max-width: 600px) { .pf-arc { grid-template-columns: minmax(0, 1fr); } .pf-arrow { transform: rotate(90deg); justify-self: center; } .pf-grid { grid-template-columns: minmax(0, 1fr); } }
+@media (hover: none) { .pf-field input, .modal .pf-ta { font-size: 16px; } }
 .modal.notes { width: min(760px, 100%); height: min(780px, calc(100dvh - 32px)); }
 .notes-head { display: flex; align-items: center; gap: 8px; }
 .notes-head .av { width: 22px; height: 22px; font-size: 10px; }
@@ -565,6 +589,76 @@ function sample() {
   };
 }
 
+/* Character profile fields, in display order. `short` ones sit in a compact grid; the rest are paragraphs. */
+const CHAR_FIELDS = [
+  { k: 'alias', label: 'Title or alias', short: true, hint: 'e.g. Atom-Ripper, The Hammer' },
+  { k: 'age', label: 'Age', short: true, hint: 'e.g. 19, late 50s' },
+  { k: 'group', label: 'Group or role', short: true, hint: 'e.g. Freshman · CHAR Unit, Faculty' },
+  { k: 'track', label: 'Track', short: true, hint: 'e.g. Combat, Ancillary' },
+  { k: 'appearance', label: 'Appearance', hint: 'Hair, eyes, build, height, clothes, how they carry themselves' },
+  { k: 'power', label: 'Power', hint: 'What they can do, its limits and costs' },
+  { k: 'growth', label: 'Power growth', hint: 'How their power changes over the story' },
+  { k: 'growthStart', label: 'At the start', hint: 'What they can do when the story begins' },
+  { k: 'growthEnd', label: 'By the end', hint: 'What they can do by the end' },
+  { k: 'personality', label: 'Personality', hint: 'Temperament, voice, habits, fears, what they want' },
+  { k: 'backstory', label: 'Backstory', hint: 'Family, history, why they’re here' },
+  { k: 'relationships', label: 'Relationships', hint: 'Friends, rivals, family, crushes, grudges' },
+  { k: 'note', label: 'Other notes', hint: 'Anything else: secrets, plot notes, reminders' },
+];
+const PLACE_FIELDS = [{ k: 'note', label: 'Description', hint: 'What it looks, sounds and smells like, who goes there, what happened here' }];
+const fieldsFor = (type) => (type === 'place' ? PLACE_FIELDS : CHAR_FIELDS);
+
+// Notes imported in the "Title / Group · Track · Age" layout are split into profile fields once.
+// Anything that doesn't fit a field stays in Other notes, so nothing is lost.
+function splitProfileNote(c) {
+  const text = (c.note || '').replace(/\r/g, '').trim();
+  const lines = text.split('\n');
+  const isMeta = (l) => /^(Freshman|Sophomore|Junior|Senior|Faculty)\b/.test(l || '') || (/ · /.test(l || '') && /(Age |track)/i.test(l || ''));
+  let meta, from;
+  if (isMeta(lines[0])) { meta = lines[0]; from = 1; }                       // "Sophomore · stand-out", then sections
+  else if (lines.length > 1 && isMeta(lines[1])) { c.alias = lines[0].trim(); meta = lines[1]; from = 2; } // "Atom-Ripper", "Freshman · … · Age 19"
+  else return;
+  const rest = [];
+  for (const part of meta.split(' · ').map((t) => t.trim()).filter(Boolean)) {
+    if (/^Age\b/i.test(part)) c.age = part.replace(/^Age\s*/i, '');
+    else if (/\btrack$/i.test(part)) c.track = part.replace(/\s*track$/i, '');
+    else rest.push(part);
+  }
+  c.group = rest.join(' · ');
+  const other = [];
+  const blocks = lines.slice(from).join('\n').split(/\n\s*\n/).map((b) => b.replace(/^\n+|\s+$/g, '')).filter((b) => b.trim());
+  // A block's text without its label: "Power: X" → "X"; a heading on its own line ("Backstory") is dropped.
+  const body = (b) => {
+    const ls = b.split('\n');
+    if (ls[0].includes(':')) ls[0] = ls[0].replace(/^[^:]*:\s*/, ''); else ls.shift();
+    return ls.map((l) => l.replace(/^ {2}/, '')).join('\n').trim();
+  };
+  const startEnd = (b) => {
+    const out = { start: [], end: [] }; let cur = null;
+    for (const l of b.split('\n').slice(1)) {
+      const t = l.trim();
+      if (/^Start:/i.test(t)) { cur = 'start'; out.start.push(t.replace(/^Start:\s*/i, '')); }
+      else if (/^End:/i.test(t)) { cur = 'end'; out.end.push(t.replace(/^End:\s*/i, '')); }
+      else if (cur) out[cur].push(l.replace(/^ {2}/, ''));
+    }
+    return cur ? { start: out.start.join('\n').trim(), end: out.end.join('\n').trim() } : null;
+  };
+  const add = (k, v) => { c[k] = c[k] ? c[k] + '\n\n' + v : v; };
+  for (const b of blocks) {
+    const head = b.split('\n')[0].trim();
+    if (/^Appearance\b/i.test(head)) add('appearance', body(b));
+    else if (/^Power escalation\s*—\s*Start/i.test(head)) add('growthStart', b.split('\n').slice(1).map((l) => l.replace(/^ {2}/, '')).join('\n').trim());
+    else if (/^Power escalation\s*—\s*End/i.test(head)) add('growthEnd', b.split('\n').slice(1).map((l) => l.replace(/^ {2}/, '')).join('\n').trim());
+    else if (/^Power escalation\b/i.test(head)) {
+      const se = startEnd(b);
+      if (se) { if (se.start) add('growthStart', se.start); if (se.end) add('growthEnd', se.end); } else add('growth', body(b));
+    } else if (/^Powers?(:|$)/i.test(head)) add('power', body(b));
+    else if (/^(Backstory|Background|Lore)(:|$)/i.test(head)) add('backstory', body(b));
+    else other.push(b.trim());
+  }
+  c.note = other.join('\n\n');
+}
+
 function normalize(s) {
   if (!s || typeof s !== 'object' || !Array.isArray(s.items)) throw new Error('This doesn’t look like a Scene Flow backup.');
   s.v = 1;
@@ -575,6 +669,10 @@ function normalize(s) {
   s.ui = s.ui || {}; s.ui.lib = Object.assign({ chars: true, places: true, climate: false }, s.ui.lib);
   if (s.ui.heat == null) s.ui.heat = true;
   for (const lib of [s.characters, s.places]) for (const x of lib) { x.id = x.id || uid(); x.name = x.name || ''; x.color = x.color || PALETTE[0]; x.note = x.note || ''; }
+  for (const c of s.characters) {
+    if (!c.profile) { splitProfileNote(c); c.profile = 1; }
+    for (const f of CHAR_FIELDS) c[f.k] = typeof c[f.k] === 'string' ? c[f.k] : '';
+  }
   // Outlines saved before the example was marked: recognise the untouched example book by its title.
   if (s.sample == null && s.title === 'Untitled novel (example)' && s.characters.some((c) => c.name === 'Ellie Hart')) s.sample = true;
   if (!s.holding || !Array.isArray(s.holding.children)) s.holding = blankHolding();
@@ -939,7 +1037,7 @@ function libGroup(key, label, lib, type, usage, ph) {
       h('input', { type: 'color', value: x.color, 'aria-label': `Colour for ${x.name}`,
         oninput: (e) => { x.color = e.target.value; sw.style.setProperty('--c', x.color); save(); renderTreeSoon(); } }));
     const openIt = () => openDetails(x, type, usage.get(x.id) || 0);
-    g.append(h('div', { class: 'lib-row' + (on ? ' on' : ''), role: 'button', tabindex: '0', title: x.note ? x.note.trim().split('\n')[0] : 'Open details',
+    g.append(h('div', { class: 'lib-row' + (on ? ' on' : ''), role: 'button', tabindex: '0', title: [x.alias, x.group].filter(Boolean).join(' · ') || (x.note ? x.note.trim().split('\n')[0] : 'Open details'),
       onclick: (e) => { if (!e.target.closest('button, label')) openIt(); },
       onkeydown: (e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget) { e.preventDefault(); openIt(); } } },
       sw,
@@ -960,33 +1058,80 @@ function libGroup(key, label, lib, type, usage, ph) {
 function openDetails(x, type, count) {
   closePop();
   const what = type === 'place' ? 'place' : 'character';
+  const fields = fieldsFor(type);
+  const filled = () => fields.some((f) => (x[f.k] || '').trim());
+  let editing = !filled();
   const close = () => { scrim.remove(); renderRail(); renderTree(); };
   const badge = h('span', { class: type === 'place' ? 'swatch sq' : 'av', style: `--c:${x.color}` }, type === 'place' ? null : initials(x.name));
   const colour = h('label', { class: 'colour-pick', title: 'Change colour' }, badge,
     h('input', { type: 'color', value: x.color, 'aria-label': 'Colour',
       oninput: (e) => { x.color = e.target.value; badge.style.setProperty('--c', x.color); save(); } }));
   const name = h('input', { id: 'details-name', class: 'details-name', value: x.name, placeholder: `Name this ${what}`, 'aria-label': 'Name', spellcheck: 'false',
-    oninput: () => { x.name = name.value; if (type !== 'place') badge.textContent = initials(x.name); save(); },
-    onkeydown: (e) => { if (e.key === 'Enter') { e.preventDefault(); ta.focus(); } } });
-  const ta = h('textarea', { id: 'notes-' + x.id, class: 'notes-ta', spellcheck: 'true', 'aria-label': `Notes for ${x.name}`,
-    placeholder: type === 'place' ? 'What it looks, sounds and smells like, who goes there, what happened here…' : 'Age, appearance, power, wants, voice, backstory…' });
-  ta.value = x.note || '';
-  ta.addEventListener('input', () => { x.note = ta.value; save(); });
+    oninput: () => { x.name = name.value; if (type !== 'place') badge.textContent = initials(x.name); save(); } });
+  const body = h('div', { class: 'profile' });
+  const modeBtn = h('button', { class: 'btn', onclick: () => { editing = !editing; draw(); } });
   let armed = false;
   const del = h('button', { class: 'btn warn', onclick: () => {
-    if (!armed) { armed = true; del.textContent = `Click again to delete`; return; }
+    if (!armed) { armed = true; del.textContent = 'Click again to delete'; return; }
     scrim.remove(); removeLib(type, x);
   } }, `Delete ${what}`);
+  // Suggestions for short fields come from what other characters already use.
+  const lists = {};
+  for (const k of ['group', 'track']) lists[k] = [...new Set(S.characters.map((c) => (c[k] || '').trim()).filter(Boolean))];
+
+  const draw = () => {
+    modeBtn.textContent = editing ? 'View profile' : 'Edit';
+    del.hidden = !editing;
+    name.readOnly = !editing;
+    name.classList.toggle('ro', !editing);
+    if (editing) {
+      const shorts = fields.filter((f) => f.short), longs = fields.filter((f) => !f.short);
+      setKids(body,
+        shorts.length ? h('div', { class: 'pf-grid' }, shorts.map((f) => {
+          const id = `pf-${x.id}-${f.k}`;
+          const inp = h('input', { id, value: x[f.k] || '', placeholder: f.hint, list: lists[f.k] ? id + '-list' : null,
+            oninput: (e) => { x[f.k] = e.target.value; save(); } });
+          return h('label', { class: 'pf-field' }, h('span', { class: 'pf-label' }, f.label), inp,
+            lists[f.k] ? h('datalist', { id: id + '-list' }, lists[f.k].map((v) => h('option', { value: v }))) : null);
+        })) : null,
+        longs.map((f) => {
+          const ta = h('textarea', { id: `pf-${x.id}-${f.k}`, class: 'pf-ta', rows: 2, placeholder: f.hint, spellcheck: 'true' });
+          ta.value = x[f.k] || '';
+          ta.addEventListener('input', () => { x[f.k] = ta.value; grow(ta); save(); });
+          return h('label', { class: 'pf-field' + (f.k.startsWith('growth') ? ' pf-growth' : '') }, h('span', { class: 'pf-label' }, f.label), ta);
+        }));
+      body.querySelectorAll('textarea').forEach(grow);
+    } else {
+      const val = (k) => (x[k] || '').trim();
+      const chips = [val('age') && `Age ${val('age')}`, val('track') && `${val('track')} track`, val('group')].filter(Boolean);
+      const para = (k) => val(k) ? h('section', { class: 'pf-sec' }, h('h3', null, fields.find((f) => f.k === k).label), h('div', { class: 'pf-text' }, val(k))) : null;
+      const growth = val('growth') || val('growthStart') || val('growthEnd');
+      setKids(body,
+        val('alias') || chips.length ? h('div', { class: 'pf-top' },
+          val('alias') ? h('div', { class: 'pf-alias' }, val('alias')) : null,
+          chips.length ? h('div', { class: 'pf-chips' }, chips.map((t) => h('span', { class: 'pf-chip' }, t))) : null) : null,
+        type === 'place' ? para('note') : [
+          para('appearance'), para('power'),
+          growth ? h('section', { class: 'pf-sec' }, h('h3', null, 'Power growth'),
+            val('growth') ? h('div', { class: 'pf-text' }, val('growth')) : null,
+            val('growthStart') || val('growthEnd') ? h('div', { class: 'pf-arc' },
+              val('growthStart') ? h('div', { class: 'pf-card' }, h('span', { class: 'pf-k' }, 'At the start'), h('div', { class: 'pf-text' }, val('growthStart'))) : null,
+              val('growthStart') && val('growthEnd') ? h('span', { class: 'pf-arrow', 'aria-hidden': 'true' }, '→') : null,
+              val('growthEnd') ? h('div', { class: 'pf-card' }, h('span', { class: 'pf-k' }, 'By the end'), h('div', { class: 'pf-text' }, val('growthEnd'))) : null) : null) : null,
+          para('personality'), para('backstory'), para('relationships'), para('note')],
+        filled() ? null : h('p', { class: 'pf-empty' }, 'Nothing written yet. ', h('button', { onclick: () => { editing = true; draw(); } }, 'Add details')));
+      body.scrollTop = 0;
+    }
+  };
   const scrim = h('div', { class: 'scrim', onclick: (e) => { if (e.target === scrim) close(); } },
     h('div', { class: 'modal notes', role: 'dialog', 'aria-modal': 'true', 'aria-label': `${what} details` },
-      h('div', { class: 'notes-head' }, colour, name, h('span', { class: 'stat' }, `${count} scene${count === 1 ? '' : 's'}`)),
-      ta,
+      h('div', { class: 'notes-head' }, colour, name, h('span', { class: 'stat' }, `${count} scene${count === 1 ? '' : 's'}`), modeBtn),
+      body,
       h('div', { class: 'btns' }, del, h('span', { class: 'hint' }, 'Saves as you type.'), h('span', { class: 'spacer' }), h('button', { class: 'btn primary', onclick: close }, 'Done'))));
   scrim.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.stopPropagation(); close(); } });
   document.body.append(scrim);
-  ta.scrollTop = 0;
-  // On phones, don't pop the keyboard up until a field is tapped.
-  if (!TOUCH) { ta.focus(); ta.setSelectionRange(0, 0); ta.scrollTop = 0; }
+  draw();
+  if (editing && !TOUCH) (x.name ? body.querySelector('input, textarea') : name)?.focus();
 }
 function climateGroup() {
   const g = h('div', { class: 'grp' + (S.ui.lib.climate ? ' open' : '') }, groupHead('climate', 'Climate by month'));
@@ -1002,6 +1147,7 @@ function createLib(type, name) {
   const used = new Set(lib.map((x) => x.color));
   const color = PALETTE.find((c) => !used.has(c)) || PALETTE[lib.length % PALETTE.length];
   const x = { id: uid(), name, color, note: '' };
+  if (type !== 'place') { x.profile = 1; for (const f of CHAR_FIELDS) x[f.k] = x[f.k] || ''; }
   lib.push(x);
   return x;
 }
@@ -1278,7 +1424,7 @@ function openBackup() {
       let n = 0;
       for (const x of from) {
         if (have.has(x.name.trim().toLowerCase())) continue;
-        into.push({ id: ids.has(x.id) ? uid() : x.id, name: x.name, color: x.color, note: x.note });
+        into.push(Object.assign(JSON.parse(JSON.stringify(x)), { id: ids.has(x.id) ? uid() : x.id }));
         n++;
       }
       return n;
@@ -1333,7 +1479,14 @@ function outlineMarkdown(opt) {
     out.push('## Characters', '');
     for (const c of S.characters) {
       const stats = [`in ${scenes(usage.get(c.id) || 0)}`, povs.get(c.id) ? `POV in ${povs.get(c.id)}` : null].filter(Boolean).join(', ');
-      out.push(`- **${c.name || '(unnamed)'}** (${stats})${noteText(c.note)}`);
+      const head = [c.alias, stats].filter(Boolean).join('; ');
+      out.push(`- **${c.name || '(unnamed)'}** (${head})`);
+      for (const f of CHAR_FIELDS) {
+        if (f.k === 'alias') continue;
+        const v = (c[f.k] || '').trim();
+        if (!v) continue;
+        out.push(v.includes('\n') ? `    ${f.label}:\n${indent(v, '        ')}` : `    ${f.label}: ${v}`);
+      }
     }
     out.push('');
   }
