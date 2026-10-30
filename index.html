@@ -54,6 +54,7 @@
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html, body { height: 100%; }
 body {
   margin: 0; background: var(--bg); color: var(--fg);
@@ -252,6 +253,10 @@ textarea::placeholder { color: var(--faint); }
 .heat-tab:hover { width: 8px; }
 .heaton .scene[data-h] { background: color-mix(in srgb, var(--hc) 9%, var(--panel)); border-color: color-mix(in srgb, var(--hc) 30%, var(--line)); }
 .hsw { width: 12px; height: 12px; border-radius: 3px; background: var(--hc, var(--line)); flex: none; }
+.banner { max-width: 980px; display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap; margin-bottom: 10px; padding: 8px 10px; border: 1px solid var(--accent); border-radius: 6px; background: var(--accent-soft); }
+.banner p { margin: 0; flex: 1 1 260px; min-width: 0; line-height: 1.45; }
+.banner b { font-weight: 600; }
+.banner .btns { display: flex; gap: 6px; flex-wrap: wrap; }
 .flow { display: none; max-width: 980px; margin-bottom: 10px; padding: 6px 8px 4px; background: var(--panel); border: 1px solid var(--line); border-radius: 4px; }
 .heaton .flow { display: block; }
 .flow-h { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; font-size: var(--fs-s); color: var(--muted); margin-bottom: 4px; }
@@ -346,6 +351,7 @@ textarea::placeholder { color: var(--faint); }
 <div class="layout" id="layout">
   <aside class="rail" id="rail" aria-label="Library"></aside>
   <main>
+    <div class="banner" id="banner" hidden></div>
     <div class="flow" id="flow"></div>
     <div class="tree" id="tree"></div>
     <div class="rootadd" id="rootadd"></div>
@@ -475,6 +481,7 @@ function sample() {
   const sc = (title, o) => Object.assign(blankScene(title), o);
   return {
     v: 1,
+    sample: true,
     title: 'Untitled novel (example)',
     characters: [ellie, mara, hollis, jun],
     places: [cottage, station, lane, hall],
@@ -524,6 +531,8 @@ function normalize(s) {
   s.ui = s.ui || {}; s.ui.lib = Object.assign({ chars: true, places: true, climate: false }, s.ui.lib);
   if (s.ui.heat == null) s.ui.heat = true;
   for (const lib of [s.characters, s.places]) for (const x of lib) { x.id = x.id || uid(); x.name = x.name || ''; x.color = x.color || PALETTE[0]; x.note = x.note || ''; }
+  // Outlines saved before the example was marked: recognise the untouched example book by its title.
+  if (s.sample == null && s.title === 'Untitled novel (example)' && s.characters.some((c) => c.name === 'Ellie Hart')) s.sample = true;
   if (!s.holding || !Array.isArray(s.holding.children)) s.holding = blankHolding();
   Object.assign(s.holding, { id: 'holding', type: 'section', title: 'Holding' });
   walk([...s.items, s.holding], (n) => {
@@ -582,7 +591,32 @@ function sceneMatches(s) {
 const filtering = () => !!(filter || query);
 
 /* ================= rendering ================= */
-function renderAll() { renderBar(); renderTree(); renderRail(); }
+function renderAll() { renderBar(); renderTree(); renderRail(); renderBanner(); }
+
+let bannerHidden = false;
+function renderBanner() {
+  const b = $('#banner');
+  b.hidden = !S.sample || bannerHidden;
+  if (b.hidden) return b.replaceChildren();
+  setKids(b,
+    h('p', null, h('b', null, 'This is an example book'), ' so you can see how everything works. When you’re ready, clear it and start your own.'),
+    h('span', { class: 'btns' },
+      h('button', { class: 'btn primary', onclick: newBook }, 'Start my own book'),
+      h('button', { class: 'btn', onclick: openBackup }, 'Load a saved file…'),
+      h('button', { class: 'btn', onclick: () => { bannerHidden = true; renderBanner(); } }, 'Keep exploring')));
+}
+function blankBook() {
+  return normalize({ v: 1, title: 'Untitled novel', characters: [], places: [], climate: [], items: [], holding: blankHolding(),
+    ui: { lib: { chars: true, places: true, climate: false }, heat: S ? S.ui.heat : true } });
+}
+function newBook() {
+  closePop(); $('.scrim')?.remove();
+  snapshot();
+  S = blankBook(); filter = null; query = '';
+  save(); renderAll();
+  toast('Started a new, empty book', 'Undo', undo);
+  setTimeout(() => $('.brand .book')?.focus());
+}
 
 let treeT;
 function renderTreeSoon() { clearTimeout(treeT); treeT = setTimeout(renderTree, 300); }
@@ -616,6 +650,7 @@ function renderFlow() {
       title: `${num}. ${n.title || 'Untitled scene'} · ${n.heat ? HEAT[n.heat] : 'no intensity set'}${parent && parent.title ? ` (${parent.title})` : ''}`,
       'aria-label': `Go to scene ${num}`, onclick: () => reveal(n.id) }));
   });
+  flow.hidden = !total;
   setKids(flow,
     h('div', { class: 'flow-h' }, h('b', null, 'Intensity flow'),
       h('span', null, total ? `${set}/${total} scenes rated${set ? ` · average ${(sum / set).toFixed(1)}` : ''}` : 'No scenes yet'),
@@ -1152,6 +1187,11 @@ function openBackup() {
     if (!armed) { armed = true; replaceBtn.textContent = 'Click again to replace everything'; return; }
     snapshot(); S = next; save(); filter = null; scrim.remove(); renderAll(); toast('Outline restored', 'Undo', undo);
   } }, 'Replace outline with this');
+  let newArmed = false;
+  const newBtn = h('button', { class: 'btn warn', title: 'Removes every scene, section, character and place', onclick: () => {
+    if (!newArmed) { newArmed = true; newBtn.textContent = 'Click again to clear everything'; return; }
+    newBook();
+  } }, 'Start a new, empty book');
   const mergeBtn = h('button', { class: 'btn', title: 'Adds characters and places whose names aren’t in your list yet. Scenes and everything else stay as they are.', onclick: () => {
     let next;
     try { next = normalize(JSON.parse(ta.value)); } catch (err) { toast('That text isn’t a valid backup. Paste the full text you copied, starting with {'); return; }
@@ -1189,7 +1229,7 @@ function openBackup() {
         h('button', { class: 'btn', onclick: () => file.click() }, 'Open file…'),
         h('span', { class: 'spacer' }),
         mergeBtn, replaceBtn, file),
-      h('div', { class: 'btns' }, h('span', { class: 'spacer' }), h('button', { class: 'btn', onclick: () => scrim.remove() }, 'Close'))));
+      h('div', { class: 'btns' }, newBtn, h('span', { class: 'spacer' }), h('button', { class: 'btn', onclick: () => scrim.remove() }, 'Close'))));
   document.body.append(scrim);
 }
 

@@ -19,6 +19,10 @@ Open `index.html` in any modern browser. There's nothing to install or build.
 - **Share with AI** turns your outline into plain text with names written out, ready to paste into an AI chat. You can leave out scene details, status or the weather table.
 - **Search** (`/`) and **Undo** (Ctrl/⌘+Z) for structural changes.
 
+## Starting your own book
+
+The app opens with an example book. Click **Start my own book** in the banner at the top, or **Backup → Start a new, empty book** at any time. Loading your own file with **Backup → Open file… → Replace outline with this** also replaces the example.
+
 ## Saving
 
 Everything saves automatically to your browser's local storage on this device. Use **Backup** to copy or download your outline as a file now and then, and to restore it on another device. **Add new characters & places** in the same window brings in only the characters and places from a file that aren't in your list yet, leaving your scenes and existing notes alone.
