@@ -1536,7 +1536,7 @@ function openBackup() {
     if (!newArmed) { newArmed = true; newBtn.textContent = 'Click again to clear everything'; return; }
     newBook();
   } }, 'Start a new, empty book');
-  const mergeBtn = h('button', { class: 'btn', title: 'Adds what’s new in the file: characters, places and plot threads not in your lists yet, and its sections and scenes at the end of your outline. Nothing you already have is changed or removed.', onclick: () => {
+  const mergeBtn = h('button', { class: 'btn', title: 'Adds what’s new in the file: characters, places and plot threads not in your lists yet, its sections and scenes at the end of your outline, and weather for any empty months. Nothing you already have is changed or removed.', onclick: () => {
     let next;
     try { next = normalize(JSON.parse(ta.value)); } catch (err) { toast('That text isn’t a valid backup. Paste the full text you copied, starting with {'); return; }
     snapshot();
@@ -1572,10 +1572,15 @@ function openBackup() {
     S.items.push(...bring(next.items));
     S.holding.children.push(...bring(next.holding.children));
     if (sc) S.sample = false;
+    // Typical weather fills only the months that are still empty.
+    let wx = 0;
+    next.climate.forEach((w, i) => { if (w && !(S.climate[i] || '').trim()) { S.climate[i] = w; wx++; } });
+    const wxKept = next.climate.filter((w, i) => w && S.climate[i] !== w).length;
+    if (wx) S.ui.lib.climate = true;
     save(); scrim.remove(); renderAll();
     const plural = (k, w) => `${k} ${w}${k === 1 ? '' : 's'}`;
-    const parts = [sc && plural(sc, 'scene'), c && plural(c, 'character'), pl && plural(pl, 'place'), th && plural(th, 'plot thread')].filter(Boolean);
-    toast(parts.length ? `Added ${parts.join(', ')}` : 'Nothing new to add', parts.length ? 'Undo' : null, undo);
+    const parts = [sc && plural(sc, 'scene'), c && plural(c, 'character'), pl && plural(pl, 'place'), th && plural(th, 'plot thread'), wx && `weather for ${plural(wx, 'month')}`].filter(Boolean);
+    toast((parts.length ? `Added ${parts.join(', ')}` : 'Nothing new to add') + (wxKept ? ` · kept your own weather for ${plural(wxKept, 'month')}` : ''), parts.length ? 'Undo' : null, undo);
   } }, 'Add from file');
   const scrim = h('div', { class: 'scrim', onclick: (e) => { if (e.target === scrim) scrim.remove(); } },
     h('div', { class: 'modal', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'bk-h' },
