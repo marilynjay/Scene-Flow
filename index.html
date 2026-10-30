@@ -3,6 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<script>
+  // iPhone/iPad zoom in when a small-text field is tapped; maximum-scale stops that (pinch zoom still works there).
+  if (/iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1))
+    document.querySelector('meta[name="viewport"]').content += ', maximum-scale=1';
+</script>
 <meta name="theme-color" content="#1c3260">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -126,6 +131,7 @@ main {
 
 /* ---------- library rail ---------- */
 .grp { margin-bottom: 10px; }
+.rail-close { display: none; align-items: center; justify-content: flex-end; gap: 4px; width: 100%; height: 32px; padding: 0 6px; color: var(--muted); font-size: 14px; }
 .grp-h { display: flex; align-items: center; gap: 4px; width: 100%; height: 22px; padding: 0 4px; color: var(--muted); font-size: var(--fs-s); text-transform: uppercase; letter-spacing: .07em; font-weight: 600; }
 .grp-h .n { font: 400 10px var(--mono); color: var(--faint); letter-spacing: 0; }
 .grp-h .caret { transition: transform .12s; }
@@ -245,6 +251,7 @@ textarea::placeholder { color: var(--faint); }
 .row:hover .plq.empty, .row:focus-within .plq.empty, .plq.empty:focus-visible { opacity: 1; }
 @media (hover: none) { .plq.empty, .grip, .dots, .acts { opacity: .6; } .lib-row .ib.hov { visibility: visible; } }
 html { touch-action: manipulation; }
+@media (hover: none) { .details-name, textarea.notes-ta, .search input, .lib-add input { font-size: 16px; } }
 .av { display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; background: var(--c); color: #fff; font: 600 8.5px/1 var(--ui); letter-spacing: .02em; flex: none; text-shadow: 0 0 2px rgba(0,0,0,.25); }
 .stack { display: inline-flex; }
 .stack .av { box-shadow: 0 0 0 1.5px var(--bg); }
@@ -313,6 +320,20 @@ html { touch-action: manipulation; }
 
 /* popovers, menu, modal, toast */
 .pop { position: fixed; z-index: 50; background: var(--panel); border: 1px solid var(--line-strong); border-radius: 6px; box-shadow: var(--shadow); padding: 4px; min-width: 180px; max-width: min(260px, calc(100vw - 16px)); }
+.pop-scrim { position: fixed; inset: 0; z-index: 49; background: rgba(10, 14, 22, .3); }
+.pop.sheet {
+  left: 0; right: 0; top: 0; max-width: none; min-width: 0; width: 100%; border-radius: 0 0 12px 12px; border-top: 0;
+  padding-block: calc(8px + env(safe-area-inset-top, 0px)) 10px;
+  padding-left: max(12px, env(safe-area-inset-left, 0px)); padding-right: max(12px, env(safe-area-inset-right, 0px));
+  max-height: 75dvh; display: flex; flex-direction: column; gap: 4px;
+}
+.sheet .pk-list { max-height: none; flex: 1; min-height: 0; overflow-y: auto; }
+.sheet .pk-search { height: 38px; font-size: 16px; flex: none; }
+.sheet .pk-item, .sheet .mi { min-height: 42px; font-size: 15px; }
+.sheet .pk-item .av { width: 22px; height: 22px; font-size: 10px; }
+.sheet .mi .k { font-size: 12px; }
+.sheet .msep { flex: none; }
+.sheet-done { flex: none; height: 40px; font-size: 15px; margin-top: 4px; }
 .pk-search { width: 100%; height: 24px; border: 1px solid var(--line); border-radius: 4px; padding: 0 6px; background: var(--bg); outline: 0; margin-bottom: 3px; }
 .pk-search:focus { border-color: var(--accent); }
 .pk-list { max-height: 260px; overflow-y: auto; display: flex; flex-direction: column; }
@@ -350,7 +371,10 @@ html { touch-action: manipulation; }
 @media (max-width: 760px) {
   .layout, .layout.norail { grid-template-columns: minmax(0, 1fr); }
   .rail { display: none; }
-  .layout.railopen .rail { display: block; position: fixed; z-index: 35; left: 0; top: calc(37px + env(safe-area-inset-top, 0px)); width: min(280px, 85vw); box-shadow: var(--shadow); }
+  .layout.railopen .rail { display: block; position: fixed; z-index: 35; left: 0; top: 0; height: 100dvh; width: min(300px, 85vw); box-shadow: var(--shadow);
+    padding-top: calc(8px + env(safe-area-inset-top, 0px)); padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
+  .rail-close { display: flex; }
+  .bar { position: static; }
   .seg-label, .stat { display: none; }
 }
 @media (max-width: 600px) {
@@ -835,7 +859,8 @@ function renderTime(n) {
 /* ================= toolbar ================= */
 function renderBar() {
   const bar = $('#bar');
-  const levels = [['Sections', 0], ['Scenes', 1], ['Summaries', 2], ['Details', 3]];
+  const levels = [['Collapse all', 0, 'Fold everything down to section headings'], ['Titles', 1, 'Open every section and show scene titles only'],
+    ['Descriptions', 2, 'Show each scene’s short description'], ['Everything', 3, 'Show descriptions and details']];
   const fl = filter && (filter.type === 'char' ? charById(filter.id) : placeById(filter.id));
   const searchInput = h('input', { id: 'q', type: 'search', placeholder: 'Search scenes  /', value: query, 'aria-label': 'Search scenes',
     oninput: (e) => { query = e.target.value.trim(); renderTree(); } });
@@ -846,8 +871,8 @@ function renderBar() {
     fl ? h('span', { class: 'filterchip' }, icon('filter'), fl.name || '(unnamed)',
       h('button', { 'aria-label': 'Clear filter', title: 'Clear filter', onclick: () => { filter = null; renderAll(); } }, icon('x'))) : null,
     h('span', { class: 'spacer' }),
-    h('span', { class: 'seg-label' }, 'Show'),
-    h('span', { class: 'seg', role: 'group', 'aria-label': 'Expand outline to' }, levels.map(([label, l]) => h('button', { title: `Expand everything to ${label.toLowerCase()}`, onclick: () => setLevel(l) }, label))),
+    h('span', { class: 'seg-label' }, 'View'),
+    h('span', { class: 'seg', role: 'group', 'aria-label': 'Expand outline to' }, levels.map(([label, l, tip]) => h('button', { title: tip, onclick: () => setLevel(l) }, label))),
     h('button', { class: 'tb' + (S.ui.heat ? ' on' : ''), title: 'Show or hide intensity colours and the flow chart', 'aria-pressed': String(!!S.ui.heat),
       onclick: () => { S.ui.heat = !S.ui.heat; save(); renderBar(); renderTree(); } }, h('span', { class: 'hsw', style: 'width:10px;height:10px;background:linear-gradient(90deg,var(--h1),var(--h2),var(--h3),var(--h4),var(--h5))' }), 'Heatmap'),
     h('span', { class: 'stat', id: 'stat' }),
@@ -878,6 +903,7 @@ function applyRail() {
 }
 
 /* ================= library rail ================= */
+function closeRail() { railOpen = false; applyRail(); renderBar(); }
 function renderRail() {
   const rail = $('#rail');
   const usage = new Map();
@@ -886,7 +912,8 @@ function renderRail() {
     const ids = new Set([...n.chars, n.pov, n.place].filter(Boolean));
     ids.forEach((id) => usage.set(id, (usage.get(id) || 0) + 1));
   });
-  setKids(rail, 
+  setKids(rail,
+    h('button', { class: 'rail-close', onclick: closeRail }, 'Close', icon('x')),
     libGroup('chars', 'Characters', S.characters, 'char', usage, 'Add character…'),
     libGroup('places', 'Places', S.places, 'place', usage, 'Add place…'),
     climateGroup(),
@@ -894,7 +921,9 @@ function renderRail() {
       h('span', null, h('span', { class: 'st', 'data-s': 0 }), 'Planned'),
       h('span', null, h('span', { class: 'st', 'data-s': 1 }), 'Drafted'),
       h('span', null, h('span', { class: 'st', 'data-s': 2 }), 'Done')),
-    h('div', { class: 'hint' }, 'Drag ⠿ to reorder or drop a scene onto a section heading. Alt-click a section arrow to fold everything inside it.'));
+    h('div', { class: 'hint' }, TOUCH
+      ? 'Tap a scene’s ⋯ menu to move it up or down, or Move to… another section or Holding.'
+      : 'Drag ⠿ to reorder or drop a scene onto a section heading. Alt-click a section arrow to fold everything inside it.'));
   rail.querySelectorAll('textarea').forEach(grow);
 }
 function groupHead(key, label, n) {
@@ -992,8 +1021,20 @@ function removeLib(type, x) {
 
 /* ================= picker popover ================= */
 let pop = null;
-function closePop() { if (pop) { pop.remove(); pop = null; } }
+let popScrim = null;
+function closePop() {
+  if (pop) { pop.remove(); pop = null; }
+  if (popScrim) { popScrim.remove(); popScrim = null; }
+}
+// Phones get a full-width panel pinned to the top (clear of the keyboard) over a dimmed page; other screens get a popover by the button.
 function place(el, anchor) {
+  if (TOUCH) {
+    popScrim = h('div', { class: 'pop-scrim' });
+    el.classList.add('sheet');
+    el.append(h('button', { class: 'btn primary sheet-done', onclick: () => closePop() }, 'Done'));
+    document.body.append(popScrim, el);
+    return;
+  }
   document.body.append(el);
   const r = anchor.getBoundingClientRect(), w = el.offsetWidth, ht = el.offsetHeight;
   let left = Math.min(r.right - w, innerWidth - w - 8); left = Math.max(8, left);
@@ -1015,13 +1056,15 @@ function openPicker(anchor, kind, scene) {
       if (kind === 'pov' && scene.pov && !scene.chars.includes(scene.pov)) scene.chars.unshift(scene.pov);
     }
     save(); renderTree(); renderRail();
-    if (kind === 'chars') { draw(); input.focus(); } else closePop();
+    if (kind === 'chars') { draw(); if (!TOUCH) input.focus(); } else closePop();
   };
   const create = () => {
     const name = input.value.trim(); if (!name) return;
     const x = createLib(kind === 'place' ? 'place' : 'char', name);
     input.value = '';
     choose(x);
+    // The keyboard is already up after typing a name, so keep it there for the next one.
+    if (kind === 'chars') input.focus();
   };
   let visible = [], hi = 0;
   const opts = () => [...list.querySelectorAll('.pk-item')];
@@ -1376,7 +1419,15 @@ function toast(msg, action, fn) {
 }
 
 /* ================= global events ================= */
-document.addEventListener('pointerdown', (e) => { if (pop && !pop.contains(e.target)) closePop(); }, true);
+document.addEventListener('pointerdown', (e) => {
+  if (pop && !pop.contains(e.target)) closePop();
+  // On narrow screens the library is a drawer; a tap outside it (but not in a window opened from it) closes it.
+  if ($('#layout').classList.contains('railopen') && !e.target.closest('#rail, .scrim, .pop, .pop-scrim, [aria-label="Toggle library"]')) { closeRail(); swallowClick = true; }
+}, true);
+// The tap that closes the drawer shouldn't also press whatever is underneath it.
+let swallowClick = false;
+document.addEventListener('click', (e) => { if (swallowClick) { swallowClick = false; e.preventDefault(); e.stopPropagation(); } }, true);
+document.addEventListener('pointerup', () => { setTimeout(() => { swallowClick = false; }, 400); }, true);
 document.addEventListener('keydown', (e) => {
   const t = e.target, typing = t.isContentEditable || /INPUT|TEXTAREA|SELECT/.test(t.tagName);
   if (e.key === 'Escape') { closePop(); $('.scrim')?.remove(); }
@@ -1384,8 +1435,8 @@ document.addEventListener('keydown', (e) => {
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
   if (e.key === '/') { e.preventDefault(); $('#q')?.focus(); }
 });
-addEventListener('resize', () => { closePop(); applyRail(); });
-window.addEventListener('scroll', closePop, { passive: true });
+addEventListener('resize', () => { if (!TOUCH) closePop(); applyRail(); });
+window.addEventListener('scroll', () => { if (!TOUCH) closePop(); }, { passive: true });
 
 $('#rootadd').append(
   h('button', { onclick: () => addRoot('section') }, icon('plus'), 'Section'),
