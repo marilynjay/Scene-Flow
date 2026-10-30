@@ -240,6 +240,19 @@ main {
 .row:hover .acts, .row:focus-within .acts { opacity: 1; }
 .acts button { height: 18px; padding: 0 5px; border-radius: 3px; color: var(--muted); font-size: var(--fs-s); white-space: nowrap; }
 .acts button:hover { background: var(--accent-soft); color: var(--accent); }
+.sec-body { display: flex; flex-direction: column; gap: 3px; padding: 0 8px 4px 38px; }
+.section.d0 > .sec-body { padding-left: 40px; }
+textarea.ssum { display: block; width: 100%; resize: none; overflow: hidden; border: 1px solid transparent; border-radius: 3px; background: none; padding: 2px 5px; margin: 0; outline: 0; field-sizing: content; min-height: 22px;
+  font: italic 400 12.5px/1.5 var(--book); color: var(--muted); max-width: 80ch; }
+.section.d0 > .sec-body textarea.ssum { font-size: 13px; color: var(--fg); }
+textarea.ssum:hover { border-color: var(--line); }
+textarea.ssum::placeholder { color: var(--faint); }
+.sec-body .more { color: var(--faint); }
+textarea.sdetails { max-width: 80ch; }
+.view-note { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; color: var(--muted); font-size: var(--fs-s); padding: 2px 4px 6px; }
+.view-note button { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
+.seg button.on { background: var(--accent-soft); color: var(--accent); }
+@media (hover: none) { textarea.ssum { font-size: 16px; } }
 .kids { display: flex; flex-direction: column; gap: 3px; margin: 1px 0 4px 9px; padding-left: 10px; border-left: 1px solid var(--line); }
 .emptykid { color: var(--faint); font-size: var(--fs-s); padding: 3px 4px; }
 .emptykid button { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
@@ -357,7 +370,7 @@ textarea::placeholder { color: var(--faint); }
 .plq .t { overflow: hidden; text-overflow: ellipsis; min-width: 0; color: var(--fg); }
 .plq.empty { background: none; border-style: dashed; color: var(--faint); opacity: 0; }
 .row:hover .plq.empty, .row:focus-within .plq.empty, .plq.empty:focus-visible { opacity: 1; }
-@media (hover: none) { .plq.empty, .grip, .dots, .acts { opacity: .6; } .lib-row .ib.hov { visibility: visible; } }
+@media (hover: none) { .acts { display: none; } .plq.empty, .grip, .dots { opacity: .6; } .lib-row .ib.hov { visibility: visible; } }
 html { touch-action: manipulation; }
 @media (hover: none) { .details-name, textarea.notes-ta, .search input, .lib-add input { font-size: 16px; } }
 .av { display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; background: var(--c); color: #fff; font: 600 8.5px/1 var(--ui); letter-spacing: .02em; flex: none; text-shadow: 0 0 2px rgba(0,0,0,.25); }
@@ -624,7 +637,7 @@ let railOpen = true;
 const undoStack = [];
 
 function blankScene(title = '') { return { id: uid(), type: 'scene', title, summary: '', details: '', pov: null, place: null, chars: [], threads: [], todos: [], status: 0, open: 0 }; }
-function blankSection(title = '') { return { id: uid(), type: 'section', title, collapsed: false, children: [] }; }
+function blankSection(title = '') { return { id: uid(), type: 'section', title, summary: '', details: '', open: 0, collapsed: false, children: [] }; }
 function blankHolding() { return { id: 'holding', type: 'section', title: 'Holding', collapsed: false, children: [] }; }
 function blankTime(label = '') { return { id: uid(), type: 'time', label, month: 0, weather: '' }; }
 
@@ -789,7 +802,7 @@ function normalize(s) {
   Object.assign(s.holding, { id: 'holding', type: 'section', title: 'Holding' });
   walk([...s.items, s.holding], (n) => {
     n.id = n.id || uid();
-    if (n.type === 'section') n.children = Array.isArray(n.children) ? n.children : [];
+    if (n.type === 'section') { n.children = Array.isArray(n.children) ? n.children : []; n.summary = n.summary || ''; n.details = n.details || ''; n.open = n.open ? 1 : 0; }
     if (n.type === 'scene') { n.chars = Array.isArray(n.chars) ? n.chars : []; n.threads = Array.isArray(n.threads) ? n.threads : []; n.todos = fixTodos(n.todos); n.open = n.open || 0; n.status = n.status || 0; n.heat = n.heat >= 1 && n.heat <= 5 ? n.heat : 0; }
   });
   return s;
@@ -886,6 +899,8 @@ function renderTree() {
   const frag = document.createDocumentFragment();
   renderList(S.items, frag, 0, nums);
   root.replaceChildren(frag);
+  if (S.ui.scenesHidden && S.items.length) root.prepend(h('div', { class: 'view-note' }, icon('eye'), `Scenes are hidden (${S.items.length ? (() => { let k = 0; walk(S.items, (x) => { if (x.type === 'scene') k++; }); return k; })() : 0}). `,
+    h('button', { onclick: () => setLevel(1) }, 'Show scene titles')));
   if (!S.items.length) root.append(h('div', { class: 'emptykid' }, 'Nothing here yet. Start with a section (like “Part One” or “Arrival day”) or a scene below.'));
   else if (hiding() && !root.querySelector('.scene')) root.append(h('div', { class: 'emptykid' }, 'No scenes match this filter yet.'));
   setKids($('#holding'), renderHolding(nums));
@@ -942,6 +957,7 @@ function openHeat(anchor, scene) {
 }
 function renderList(list, into, depth, nums) {
   for (const n of list) {
+    if (S.ui.scenesHidden && n.type === 'scene') continue;
     if (hiding() && ((n.type === 'scene' && !sceneMatches(n)) || (n.type === 'section' && !sectionMatches(n)))) continue;
     if (n.type === 'section') into.append(renderSection(n, depth, nums));
     else if (n.type === 'scene') into.append(renderScene(n, nums.get(n.id)));
@@ -959,6 +975,11 @@ function dotsBtn(n) {
   return h('button', { class: 'ib dots', title: 'More actions', 'aria-label': 'More actions', onclick: (e) => openMenu(e.currentTarget, n) }, icon('dots'));
 }
 
+const describing = new Set();   // sections showing an empty description box
+function describeSection(n) {
+  describing.add(n.id); renderTree();
+  const f = () => $(`[data-id="${n.id}"] > .sec-body textarea.ssum`)?.focus(); f(); setTimeout(f);
+}
 function renderSection(n, depth, nums) {
   const count = scenesIn(n);
   let anyMatch = true;
@@ -976,16 +997,27 @@ function renderSection(n, depth, nums) {
     editable('stitle', n.title, 'Untitled section', (v) => { n.title = v; }),
     h('span', { class: 'count' }, count ? `${count}` : ''),
     h('span', { class: 'acts' },
+      n.summary || describing.has(n.id) ? null : h('button', { onclick: (e) => { e.stopPropagation(); describeSection(n); }, title: 'Describe what happens in this section' }, '+ Description'),
       h('button', { onclick: add('scene'), title: 'Add a scene at the end of this section' }, '+ Scene'),
       h('button', { onclick: add('time'), title: 'Add a time marker at the end of this section' }, '+ Time'),
       h('button', { onclick: add('section'), title: 'Add a sub-section' }, '+ Section')),
     dotsBtn(n));
   const node = h('div', { class: `node section d${Math.min(depth, 3)}${anyMatch ? '' : ' dim'}`, 'data-id': n.id }, row);
+  if (n.summary || n.details || describing.has(n.id)) {
+    const wc = words(n.details);
+    const sum = area('ssum', n.summary, 'What happens in this section, in a sentence or two…', (v) => { n.summary = v; });
+    sum.addEventListener('blur', () => { if (!n.summary.trim() && !n.details.trim() && describing.delete(n.id)) renderTree(); });
+    node.append(h('div', { class: 'sec-body' }, sum,
+      h('div', { class: 'body-acts' },
+        h('button', { class: 'more' + (n.open ? ' on' : ''), 'aria-expanded': String(!!n.open), onclick: () => { n.open = n.open ? 0 : 1; save(); renderTree(); } },
+          icon('right'), 'Details', wc ? h('span', { class: 'wc' }, `${wc}w`) : null)),
+      n.open ? area('details sdetails', n.details, 'Notes for this section: arc, purpose, what has to land…', (v) => { n.details = v; }) : null));
+  }
   if (!n.collapsed) {
     const kids = h('div', { class: 'kids' });
     renderList(n.children, kids, depth + 1, nums);
     if (!n.children.length) kids.append(h('div', { class: 'emptykid' }, 'Empty. ', h('button', { onclick: () => addInside(n, 'scene') }, 'Add a scene'), ' or drag one onto this heading.'));
-    node.append(kids);
+    if (kids.children.length || !S.ui.scenesHidden) node.append(kids);
   }
   return node;
 }
@@ -1264,7 +1296,7 @@ function renderTime(n) {
 /* ================= toolbar ================= */
 function renderBar() {
   const bar = $('#bar');
-  const levels = [['Collapse all', 0, 'Fold everything down to section headings'], ['Titles', 1, 'Open every section and show scene titles only'],
+  const levels = [['Sections', 0, 'Show every section and its description, with scenes hidden'], ['Titles', 1, 'Open every section and show scene titles only'],
     ['Descriptions', 2, 'Show each scene’s short description'], ['Everything', 3, 'Show descriptions and details']];
   const fl = filterTarget();
   const searchInput = h('input', { id: 'q', type: 'search', placeholder: 'Search scenes  /', value: query, 'aria-label': 'Search scenes',
@@ -1282,7 +1314,7 @@ function renderBar() {
       : h('button', { class: 'tb', title: 'Show scenes with a character, place or plot thread', onclick: (e) => openFilterPicker(e.currentTarget) }, icon('filter'), 'Filter'),
     h('span', { class: 'spacer' }),
     h('span', { class: 'seg-label' }, 'View'),
-    h('span', { class: 'seg', role: 'group', 'aria-label': 'Expand outline to' }, levels.map(([label, l, tip]) => h('button', { title: tip, onclick: () => setLevel(l) }, label))),
+    h('span', { class: 'seg', role: 'group', 'aria-label': 'Expand outline to' }, levels.map(([label, l, tip]) => h('button', { title: tip, class: l === 0 && S.ui.scenesHidden ? 'on' : null, 'aria-pressed': l === 0 ? String(!!S.ui.scenesHidden) : null, onclick: () => setLevel(l) }, label))),
     h('button', { class: 'tb', title: 'Every to-do and open question in the book', 'aria-label': 'To-dos and questions', onclick: openQuestions },
       icon('pen'), h('span', { class: 'lbl' }, 'To-dos'), totalOpen() ? h('span', { class: 'qcount' }, totalOpen()) : null),
     h('button', { class: 'tb' + (S.ui.heat ? ' on' : ''), title: 'Show or hide intensity colours and the flow chart', 'aria-pressed': String(!!S.ui.heat),
@@ -1300,12 +1332,14 @@ function renderStat() {
   const held = scenesIn(S.holding);
   el.textContent = filtering() ? `${match}/${total} scenes` : `${total} scenes · ${done} done${held ? ` · ${held} held` : ''}`;
 }
+// Level 0 is the Sections view: every section open with its description, scenes hidden.
 function setLevel(l) {
+  S.ui.scenesHidden = l === 0;
   walk(everything(), (n) => {
-    if (n.type === 'section') n.collapsed = l === 0 ? !n.children.some((c) => c.type === 'section') : false;
-    if (n.type === 'scene') n.open = Math.max(0, l - 1);
+    if (n.type === 'section') n.collapsed = false;
+    if (n.type === 'scene' && l > 0) n.open = l - 1;
   });
-  save(); renderTree();
+  save(); renderBar(); renderTree();
 }
 function applyRail() {
   const lay = $('#layout');
@@ -1662,7 +1696,7 @@ function openMenu(anchor, n) {
   const mi = (label, fn, opts = {}) => h('button', { class: 'mi' + (opts.danger ? ' danger' : ''), disabled: opts.disabled, onclick: () => { closePop(); fn(); } }, label);
   const items = [];
   if (n.type === 'section') {
-    items.push(mi('Add scene inside', () => addInside(n, 'scene')), mi('Add time marker inside', () => addInside(n, 'time')), mi('Add sub-section inside', () => addInside(n, 'section')), h('div', { class: 'msep' }), mi('Add section below', () => addAfter(n, 'section')));
+    items.push(mi(n.summary ? 'Edit description' : 'Add description', () => describeSection(n)), h('div', { class: 'msep' }), mi('Add scene inside', () => addInside(n, 'scene')), mi('Add time marker inside', () => addInside(n, 'time')), mi('Add sub-section inside', () => addInside(n, 'section')), h('div', { class: 'msep' }), mi('Add section below', () => addAfter(n, 'section')));
   } else {
     items.push(mi('Add scene below', () => addAfter(n, 'scene')), mi('Add time marker below', () => addAfter(n, 'time')));
     if (n.type === 'scene') items.push(
@@ -1731,9 +1765,10 @@ function focusNew(id) {
     if (el) { el.focus(); el.scrollIntoView({ block: 'nearest' }); }
   });
 }
-function addInside(sec, type) { snapshot(); const x = newOf(type); sec.children.push(x); sec.collapsed = false; save(); renderAll(); focusNew(x.id); }
-function addAfter(n, type) { snapshot(); const hit = find(n.id); const x = newOf(type); hit.list.splice(hit.list.indexOf(n) + 1, 0, x); save(); renderAll(); focusNew(x.id); }
-function addRoot(type) { snapshot(); const x = newOf(type); S.items.push(x); save(); renderAll(); focusNew(x.id); }
+function showScenesFor(type) { if (type === 'scene' && S.ui.scenesHidden) { S.ui.scenesHidden = false; renderBar(); } }
+function addInside(sec, type) { showScenesFor(type); snapshot(); const x = newOf(type); sec.children.push(x); sec.collapsed = false; save(); renderAll(); focusNew(x.id); }
+function addAfter(n, type) { showScenesFor(type); snapshot(); const hit = find(n.id); const x = newOf(type); hit.list.splice(hit.list.indexOf(n) + 1, 0, x); save(); renderAll(); focusNew(x.id); }
+function addRoot(type) { showScenesFor(type); snapshot(); const x = newOf(type); S.items.push(x); save(); renderAll(); focusNew(x.id); }
 function shift(n, d) {
   const { list } = find(n.id); const i = list.indexOf(n), j = i + d;
   if (j < 0 || j >= list.length) return;
@@ -1955,6 +1990,8 @@ function outlineMarkdown(opt) {
         if (opt.onlyFilter && !sectionMatches(n)) { if (!held) num += scenesIn(n); continue; }
         const t = n.title || 'Untitled section';
         out.push(depth < 4 ? `${'#'.repeat(depth + 3)} ${t}` : `**${t}**`, '');
+        if (n.summary.trim()) out.push(`_${n.summary.trim().replace(/\s*\n\s*/g, ' ')}_`, '');
+        if (opt.details && n.details.trim()) out.push(n.details.trim(), '');
         list(n.children, depth + 1);
       } else if (n.type === 'time') {
         const month = n.month ? MONTHS[n.month - 1] : '';
@@ -1963,6 +2000,7 @@ function outlineMarkdown(opt) {
         out.push(`> **Time:** ${when || 'time passes'}${weather ? ` · Weather: ${weather}` : ''}`, '');
       } else if (n.type === 'scene') {
         if (!held) num++;
+        if (!opt.scenes) continue;
         if (opt.onlyFilter && !sceneMatches(n)) continue;
         out.push(`**${held ? 'Held scene' : `Scene ${num}`}: ${n.title || 'Untitled scene'}**${opt.status ? ` · _${STATUS[n.status || 0]}_` : ''}`);
         const pov = charById(n.pov), pl = placeById(n.place);
@@ -1988,7 +2026,7 @@ function outlineMarkdown(opt) {
 }
 function openAiExport() {
   closePop();
-  const opt = { details: true, status: true, climate: true, holding: true, questions: true, onlyFilter: !!filter };
+  const opt = { scenes: true, details: true, status: true, climate: true, holding: true, questions: true, onlyFilter: !!filter };
   const ta = h('textarea', { id: 'ai-md', spellcheck: 'false', 'aria-label': 'Outline as text' });
   const words = h('span', { class: 'stat' });
   const refresh = () => { ta.value = outlineMarkdown(opt); words.textContent = `${ta.value.split(/\s+/).length.toLocaleString()} words`; };
@@ -1998,7 +2036,7 @@ function openAiExport() {
     h('div', { class: 'modal', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'ai-h' },
       h('h2', { id: 'ai-h' }, 'Share with AI'),
       h('p', null, 'A plain-text version of your outline with names written out, so an AI can follow it easily. Copy it and paste it into a chat, then ask your question underneath. This is for reading only; use Backup to save or restore.'),
-      h('div', { class: 'btns' }, box('details', 'Scene details'), box('status', 'Status'), box('questions', 'To-dos & questions'), box('climate', 'Weather table'), box('holding', 'Holding scenes'), filter && filterTarget() ? box('onlyFilter', `Only scenes with ${filterTarget().name}`) : null),
+      h('div', { class: 'btns' }, box('scenes', 'Scenes (off: sections only)'), box('details', 'Details'), box('status', 'Status'), box('questions', 'To-dos & questions'), box('climate', 'Weather table'), box('holding', 'Holding scenes'), filter && filterTarget() ? box('onlyFilter', `Only scenes with ${filterTarget().name}`) : null),
       ta,
       h('div', { class: 'btns' },
         h('button', { class: 'btn primary', onclick: async () => {
