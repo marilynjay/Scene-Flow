@@ -983,7 +983,7 @@ function dotsBtn(n) {
 
 const describing = new Set();   // sections showing an empty description box
 function describeSection(n) {
-  if (S.ui.headingsOnly) { S.ui.headingsOnly = false; renderBar(); }
+  if (S.ui.headingsOnly) { S.ui.headingsOnly = false; S.ui.scenesHidden = false; S.ui.level = 1; renderBar(); }
   describing.add(n.id); renderTree();
   const f = () => $(`[data-id="${n.id}"] > .sec-body textarea.ssum`)?.focus(); f(); setTimeout(f);
 }
@@ -1010,7 +1010,8 @@ function renderSection(n, depth, nums) {
       h('button', { onclick: add('section'), title: 'Add a sub-section' }, '+ Section')),
     dotsBtn(n));
   const node = h('div', { class: `node section d${Math.min(depth, 3)}${anyMatch ? '' : ' dim'}`, 'data-id': n.id }, row);
-  if ((n.summary || n.details || describing.has(n.id)) && !S.ui.headingsOnly) {
+  // Section descriptions hide in the Headings and Titles views (unless one is being written).
+  if ((n.summary || n.details || describing.has(n.id)) && ((S.ui.level !== -1 && S.ui.level !== 1) || describing.has(n.id))) {
     const wc = words(n.details);
     const sum = area('ssum', n.summary, 'What happens in this section, in a sentence or two…', (v) => { n.summary = v; });
     sum.addEventListener('blur', () => { if (!n.summary.trim() && !n.details.trim() && describing.delete(n.id)) renderTree(); });
@@ -1346,10 +1347,11 @@ function renderStat() {
 }
 // Level -1 shows section titles only; 0 is the Sections view (descriptions and time markers, no scenes).
 function setLevel(l) {
+  S.ui.level = l;
   S.ui.scenesHidden = l <= 0;
   S.ui.headingsOnly = l === -1;
   walk(everything(), (n) => {
-    if (n.type === 'section') n.collapsed = false;
+    if (n.type === 'section') { n.collapsed = false; n.open = l === 3 ? 1 : 0; }
     if (n.type === 'scene' && l > 0) n.open = l - 1;
   });
   save(); renderBar(); renderTree();
@@ -2107,7 +2109,7 @@ if (/iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'Mac
 }
 
 // When a newer version of the app is published, offer to reload instead of running a stale saved copy.
-const APP_VERSION = '2026-10-30.2';
+const APP_VERSION = '2026-10-30.3';
 async function checkForUpdate() {
   if (!/github\.io$/.test(location.hostname)) return;
   try {
