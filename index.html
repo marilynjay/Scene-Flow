@@ -142,6 +142,15 @@ main {
 .ib:hover { color: var(--fg); background: var(--line); }
 .lib-row .ib.hov { visibility: hidden; }
 .lib-row:hover .ib.hov, .lib-row.on .ib.hov, .lib-row:focus-within .ib.hov { visibility: visible; }
+.lib-row { cursor: pointer; }
+.lib-row .lname { flex: 1; min-width: 0; padding: 3px 0; overflow-wrap: anywhere; }
+.colour-pick { position: relative; display: grid; place-items: center; flex: none; cursor: pointer; }
+.colour-pick input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+.colour-pick .av { width: 26px; height: 26px; font-size: 11px; }
+.colour-pick .swatch { width: 18px; height: 18px; }
+.details-name { flex: 1; min-width: 0; font: 600 15px/1.2 var(--book); border: 1px solid transparent; border-radius: 4px; background: none; padding: 4px 6px; outline: 0; }
+.details-name:hover { border-color: var(--line); }
+.details-name:focus { border-color: var(--accent); background: var(--bg); }
 .modal.notes { width: min(760px, 100%); height: min(780px, calc(100dvh - 32px)); }
 .notes-head { display: flex; align-items: center; gap: 8px; }
 .notes-head .av { width: 22px; height: 22px; font-size: 10px; }
@@ -234,7 +243,8 @@ textarea::placeholder { color: var(--faint); }
 .plq .t { overflow: hidden; text-overflow: ellipsis; min-width: 0; color: var(--fg); }
 .plq.empty { background: none; border-style: dashed; color: var(--faint); opacity: 0; }
 .row:hover .plq.empty, .row:focus-within .plq.empty, .plq.empty:focus-visible { opacity: 1; }
-@media (hover: none) { .plq.empty, .grip, .dots, .acts { opacity: .6; } }
+@media (hover: none) { .plq.empty, .grip, .dots, .acts { opacity: .6; } .lib-row .ib.hov { visibility: visible; } }
+html { touch-action: manipulation; }
 .av { display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; background: var(--c); color: #fff; font: 600 8.5px/1 var(--ui); letter-spacing: .02em; flex: none; text-shadow: 0 0 2px rgba(0,0,0,.25); }
 .stack { display: inline-flex; }
 .stack .av { box-shadow: 0 0 0 1.5px var(--bg); }
@@ -408,6 +418,7 @@ const CE = (() => { const d = document.createElement('div'); d.contentEditable =
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const PALETTE = ['#b5533c', '#3e6db0', '#4c8a48', '#8b5cb3', '#b3862b', '#2a8a8a', '#b2486f', '#6a6f2c', '#5a6a8a', '#a0623a'];
 const STATUS = ['Planned', 'Drafted', 'Done'];
+const TOUCH = matchMedia('(hover: none)').matches;
 const HEAT = [null, 'Calm', 'Uneasy', 'Tense', 'Intense', 'Critical'];
 const HEAT_HINT = [null, 'quiet talk, rest, reflection', 'slight anxiety, friction', 'conflict, real worry', 'confrontation, danger', 'life or death, a breaking point'];
 
@@ -898,15 +909,15 @@ function libGroup(key, label, lib, type, usage, ph) {
     const sw = h('label', { class: 'swatch' + (type === 'place' ? ' sq' : ''), style: `--c:${x.color}`, title: 'Change colour' },
       h('input', { type: 'color', value: x.color, 'aria-label': `Colour for ${x.name}`,
         oninput: (e) => { x.color = e.target.value; sw.style.setProperty('--c', x.color); save(); renderTreeSoon(); } }));
-    g.append(h('div', { class: 'lib-row' + (on ? ' on' : ''), title: x.note ? x.note.trim().split('\n')[0] : null },
+    const openIt = () => openDetails(x, type, usage.get(x.id) || 0);
+    g.append(h('div', { class: 'lib-row' + (on ? ' on' : ''), role: 'button', tabindex: '0', title: x.note ? x.note.trim().split('\n')[0] : 'Open details',
+      onclick: (e) => { if (!e.target.closest('button, label')) openIt(); },
+      onkeydown: (e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget) { e.preventDefault(); openIt(); } } },
       sw,
-      editable('lname', x.name, 'Name', (v) => { x.name = v; }, renderTreeSoon),
+      h('span', { class: 'lname' }, x.name || '(unnamed)'),
       h('span', { class: 'lcount', title: `In ${usage.get(x.id) || 0} scenes` }, usage.get(x.id) || ''),
-      h('button', { class: 'ib hov', title: x.note ? 'Open notes' : 'Add notes', 'aria-label': 'Notes', style: x.note ? 'visibility:visible' : null,
-        onclick: () => openNotes(x, type, usage.get(x.id) || 0) }, icon('note')),
       h('button', { class: 'ib hov', title: on ? 'Clear filter' : 'Highlight scenes with ' + (x.name || 'this'), 'aria-label': 'Filter',
-        onclick: () => { filter = on ? null : { type, id: x.id }; renderAll(); } }, icon('filter')),
-      h('button', { class: 'ib hov', title: 'Delete', 'aria-label': 'Delete', onclick: () => removeLib(type, x) }, icon('trash'))));
+        onclick: () => { filter = on ? null : { type, id: x.id }; renderAll(); } }, icon('filter'))));
   }
   const inp = h('input', { placeholder: ph, 'aria-label': ph,
     onkeydown: (e) => {
@@ -917,23 +928,36 @@ function libGroup(key, label, lib, type, usage, ph) {
   g.append(h('label', { class: 'lib-add' }, icon('plus'), inp));
   return g;
 }
-function openNotes(x, type, count) {
+function openDetails(x, type, count) {
   closePop();
-  const close = () => { scrim.remove(); renderRail(); };
+  const what = type === 'place' ? 'place' : 'character';
+  const close = () => { scrim.remove(); renderRail(); renderTree(); };
+  const badge = h('span', { class: type === 'place' ? 'swatch sq' : 'av', style: `--c:${x.color}` }, type === 'place' ? null : initials(x.name));
+  const colour = h('label', { class: 'colour-pick', title: 'Change colour' }, badge,
+    h('input', { type: 'color', value: x.color, 'aria-label': 'Colour',
+      oninput: (e) => { x.color = e.target.value; badge.style.setProperty('--c', x.color); save(); } }));
+  const name = h('input', { id: 'details-name', class: 'details-name', value: x.name, placeholder: `Name this ${what}`, 'aria-label': 'Name', spellcheck: 'false',
+    oninput: () => { x.name = name.value; if (type !== 'place') badge.textContent = initials(x.name); save(); },
+    onkeydown: (e) => { if (e.key === 'Enter') { e.preventDefault(); ta.focus(); } } });
   const ta = h('textarea', { id: 'notes-' + x.id, class: 'notes-ta', spellcheck: 'true', 'aria-label': `Notes for ${x.name}`,
     placeholder: type === 'place' ? 'What it looks, sounds and smells like, who goes there, what happened here…' : 'Age, appearance, power, wants, voice, backstory…' });
   ta.value = x.note || '';
   ta.addEventListener('input', () => { x.note = ta.value; save(); });
+  let armed = false;
+  const del = h('button', { class: 'btn warn', onclick: () => {
+    if (!armed) { armed = true; del.textContent = `Click again to delete`; return; }
+    scrim.remove(); removeLib(type, x);
+  } }, `Delete ${what}`);
   const scrim = h('div', { class: 'scrim', onclick: (e) => { if (e.target === scrim) close(); } },
-    h('div', { class: 'modal notes', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'notes-h' },
-      h('div', { class: 'notes-head' },
-        h('span', { class: (type === 'place' ? 'swatch sq' : 'av'), style: `--c:${x.color}` }, type === 'place' ? null : initials(x.name)),
-        h('h2', { id: 'notes-h' }, x.name || '(unnamed)'),
-        h('span', { class: 'stat' }, `${count} scene${count === 1 ? '' : 's'}`)),
+    h('div', { class: 'modal notes', role: 'dialog', 'aria-modal': 'true', 'aria-label': `${what} details` },
+      h('div', { class: 'notes-head' }, colour, name, h('span', { class: 'stat' }, `${count} scene${count === 1 ? '' : 's'}`)),
       ta,
-      h('div', { class: 'btns' }, h('span', { class: 'hint' }, 'Saves as you type.'), h('span', { class: 'spacer' }), h('button', { class: 'btn', onclick: close }, 'Close'))));
+      h('div', { class: 'btns' }, del, h('span', { class: 'hint' }, 'Saves as you type.'), h('span', { class: 'spacer' }), h('button', { class: 'btn primary', onclick: close }, 'Done'))));
+  scrim.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.stopPropagation(); close(); } });
   document.body.append(scrim);
-  ta.focus(); ta.setSelectionRange(0, 0); ta.scrollTop = 0;
+  ta.scrollTop = 0;
+  // On phones, don't pop the keyboard up until a field is tapped.
+  if (!TOUCH) { ta.focus(); ta.setSelectionRange(0, 0); ta.scrollTop = 0; }
 }
 function climateGroup() {
   const g = h('div', { class: 'grp' + (S.ui.lib.climate ? ' open' : '') }, groupHead('climate', 'Climate by month'));
@@ -1037,7 +1061,7 @@ function openPicker(anchor, kind, scene) {
   pop = h('div', { class: 'pop picker' }, input, list);
   draw();
   place(pop, anchor);
-  input.focus();
+  if (!TOUCH) input.focus();
 }
 
 /* ================= row menu ================= */
@@ -1094,7 +1118,7 @@ function openMoveTo(anchor, n) {
   pop = h('div', { class: 'pop picker' }, input, list);
   draw();
   place(pop, anchor);
-  input.focus();
+  if (!TOUCH) input.focus();
 }
 function moveTo(n, destId) {
   const src = find(n.id);
@@ -1367,6 +1391,12 @@ $('#rootadd').append(
   h('button', { onclick: () => addRoot('section') }, icon('plus'), 'Section'),
   h('button', { onclick: () => addRoot('scene') }, icon('plus'), 'Scene'),
   h('button', { onclick: () => addRoot('time') }, icon('plus'), 'Time marker'));
+
+// iPhone/iPad zoom in when a small-text field is tapped; maximum-scale stops that (pinch zoom still works there).
+if (/iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) {
+  const vp = document.querySelector('meta[name="viewport"]');
+  if (vp && !/maximum-scale/.test(vp.content)) vp.content += ', maximum-scale=1';
+}
 
 S = load();
 railOpen = !matchMedia('(max-width: 760px)').matches;
