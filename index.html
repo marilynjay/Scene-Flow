@@ -31,6 +31,7 @@
   --ui: "IBM Plex Sans Condensed", "Arial Narrow", "Roboto Condensed", system-ui, sans-serif;
   --book: "Literata", Georgia, "Times New Roman", serif;
   --mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  --h1: #3f7fd0; --h2: #3fa35a; --h3: #e0b822; --h4: #e9822c; --h5: #d2402f;
   --fs: 12.5px;
   --fs-s: 11px;
   --row: 24px;
@@ -232,6 +233,33 @@ textarea::placeholder { color: var(--faint); }
 .time .sep { color: color-mix(in srgb, var(--time) 50%, transparent); }
 .time.dim { opacity: .45; }
 
+/* intensity heatmap */
+.scene { position: relative; }
+.scene > .row { padding-left: 6px; }
+.heat-tab { position: absolute; left: -1px; top: -1px; bottom: -1px; width: 5px; border-radius: 4px 0 0 4px; background: transparent; z-index: 1; }
+.scene:hover > .heat-tab { background: var(--line-strong); }
+.heaton .heat-tab { background: var(--line); }
+.scene[data-h] > .heat-tab { background: transparent; }
+.heaton .scene[data-h] > .heat-tab, .scene[data-h]:hover > .heat-tab { background: var(--hc); }
+.heat-tab:hover { width: 8px; }
+.heaton .scene[data-h] { background: color-mix(in srgb, var(--hc) 9%, var(--panel)); border-color: color-mix(in srgb, var(--hc) 30%, var(--line)); }
+.hsw { width: 12px; height: 12px; border-radius: 3px; background: var(--hc, var(--line)); flex: none; }
+.flow { display: none; max-width: 980px; margin-bottom: 10px; padding: 6px 8px 4px; background: var(--panel); border: 1px solid var(--line); border-radius: 4px; }
+.heaton .flow { display: block; }
+.flow-h { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; font-size: var(--fs-s); color: var(--muted); margin-bottom: 4px; }
+.flow-h b { font-weight: 600; text-transform: uppercase; letter-spacing: .07em; font-size: 10px; }
+.flow-key { display: inline-flex; gap: 8px; flex-wrap: wrap; }
+.flow-key span { display: inline-flex; align-items: center; gap: 3px; }
+.flow-key .hsw { width: 8px; height: 8px; border-radius: 2px; }
+.bars { display: flex; align-items: flex-end; gap: 1px; height: 38px; overflow-x: auto; }
+.hbar { flex: 1 1 0; min-width: 3px; max-width: 22px; height: calc(var(--v) * 20%); background: var(--hc); border-radius: 2px 2px 0 0; }
+.hbar.none { height: 3px; background: var(--line-strong); }
+.hbar.dim { opacity: .3; }
+.hbar:hover { filter: brightness(1.15); outline: 1px solid var(--fg); }
+.bars .gap { flex: none; width: 6px; align-self: stretch; border-left: 1px dashed var(--line-strong); margin-left: 5px; }
+.flash { animation: flash 1.2s ease-out; }
+@keyframes flash { from { box-shadow: 0 0 0 3px var(--accent); } to { box-shadow: 0 0 0 3px transparent; } }
+
 /* drag and drop */
 .node.dragging { opacity: .35; }
 .row.drop-before { box-shadow: 0 -2px 0 var(--accent); }
@@ -278,6 +306,7 @@ textarea::placeholder { color: var(--faint); }
 .legend span { display: inline-flex; align-items: center; gap: 4px; }
 
 /* ---------- narrow screens ---------- */
+@media (max-width: 1280px) { .seg-label { display: none; } .search { flex-basis: 160px; } }
 @media (max-width: 760px) {
   .layout, .layout.norail { grid-template-columns: minmax(0, 1fr); }
   .rail { display: none; }
@@ -301,6 +330,7 @@ textarea::placeholder { color: var(--faint); }
 <div class="layout" id="layout">
   <aside class="rail" id="rail" aria-label="Library"></aside>
   <main>
+    <div class="flow" id="flow"></div>
     <div class="tree" id="tree"></div>
     <div class="rootadd" id="rootadd"></div>
   </main>
@@ -346,6 +376,8 @@ const CE = (() => { const d = document.createElement('div'); d.contentEditable =
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const PALETTE = ['#b5533c', '#3e6db0', '#4c8a48', '#8b5cb3', '#b3862b', '#2a8a8a', '#b2486f', '#6a6f2c', '#5a6a8a', '#a0623a'];
 const STATUS = ['Planned', 'Drafted', 'Done'];
+const HEAT = [null, 'Calm', 'Uneasy', 'Tense', 'Intense', 'Critical'];
+const HEAT_HINT = [null, 'quiet talk, rest, reflection', 'slight anxiety, friction', 'conflict, real worry', 'confrontation, danger', 'life or death, a breaking point'];
 
 function h(tag, props, ...kids) {
   const el = document.createElement(tag);
@@ -430,27 +462,27 @@ function sample() {
       'Warmest month, occasional storms · 58–73°F', 'Warm, hazy, late thunder · 57–72°F', 'Golden, cooling, morning mist · 52–66°F',
       'Wet and windy, leaves turning · 46–58°F', 'Dark by 4:30, damp, fog · 40–50°F', 'Cold, short days, rare snow · 36–46°F',
     ],
-    ui: { lib: { chars: true, places: true, climate: false } },
+    ui: { lib: { chars: true, places: true, climate: false }, heat: true },
     items: [
       Object.assign(blankSection('Arrival day'), { children: [
         Object.assign(blankTime('Day 1 · last week of August'), { month: 8 }),
         Object.assign(blankSection('Station scenes'), { collapsed: true, children: [
-          sc('Missed connection', { summary: 'Ellie’s train is late; Mara isn’t on the platform.', pov: ellie.id, place: station.id, chars: [ellie.id], status: 2 }),
+          sc('Missed connection', { summary: 'Ellie’s train is late; Mara isn’t on the platform.', pov: ellie.id, place: station.id, chars: [ellie.id], status: 2, heat: 2 }),
         ] }),
         Object.assign(blankSection('Cottage scenes'), { children: [
           sc('Keys under the mat', {
             summary: 'Ellie lets herself in. The cottage is colder and smaller than Mara promised.',
             details: '- Smell of woodsmoke and old paper\n- She finds Mara’s note: “Back by six. Don’t touch the stove.”\n- She touches the stove.',
-            pov: ellie.id, place: cottage.id, chars: [ellie.id], status: 2, open: 2 }),
-          sc('The neighbour', { summary: 'Mr. Hollis appears at the garden wall with a box of matches and opinions.', pov: ellie.id, place: lane.id, chars: [ellie.id, hollis.id], status: 1, open: 1 }),
-          sc('First night', { summary: 'Mara finally arrives. They argue about why Ellie came at all.', pov: ellie.id, place: cottage.id, chars: [ellie.id, mara.id], status: 0 }),
+            pov: ellie.id, place: cottage.id, chars: [ellie.id], status: 2, open: 2, heat: 1 }),
+          sc('The neighbour', { summary: 'Mr. Hollis appears at the garden wall with a box of matches and opinions.', pov: ellie.id, place: lane.id, chars: [ellie.id, hollis.id], status: 1, open: 1, heat: 2 }),
+          sc('First night', { summary: 'Mara finally arrives. They argue about why Ellie came at all.', pov: ellie.id, place: cottage.id, chars: [ellie.id, mara.id], status: 0, heat: 4 }),
         ] }),
       ] }),
       Object.assign(blankTime('1 month into classes'), { month: 10 }),
       Object.assign(blankSection('First term'), { children: [
         Object.assign(blankSection('Classes'), { children: [
-          sc('Seat by the window', { summary: 'Jun saves Ellie a seat without being asked.', pov: ellie.id, place: hall.id, chars: [ellie.id, jun.id] }),
-          sc('Mara alone', { summary: 'Mara’s side: what she hasn’t told Ellie about the cottage.', pov: mara.id, place: cottage.id, chars: [mara.id, hollis.id] }),
+          sc('Seat by the window', { summary: 'Jun saves Ellie a seat without being asked.', pov: ellie.id, place: hall.id, chars: [ellie.id, jun.id], heat: 1 }),
+          sc('Mara alone', { summary: 'Mara’s side: what she hasn’t told Ellie about the cottage.', pov: mara.id, place: cottage.id, chars: [mara.id, hollis.id], heat: 3 }),
         ] }),
       ] }),
     ],
@@ -465,11 +497,12 @@ function normalize(s) {
   s.places = Array.isArray(s.places) ? s.places : [];
   s.climate = Array.from({ length: 12 }, (_, i) => (s.climate && s.climate[i]) || '');
   s.ui = s.ui || {}; s.ui.lib = Object.assign({ chars: true, places: true, climate: false }, s.ui.lib);
+  if (s.ui.heat == null) s.ui.heat = true;
   for (const lib of [s.characters, s.places]) for (const x of lib) { x.id = x.id || uid(); x.name = x.name || ''; x.color = x.color || PALETTE[0]; x.note = x.note || ''; }
   walk(s.items, (n) => {
     n.id = n.id || uid();
     if (n.type === 'section') n.children = Array.isArray(n.children) ? n.children : [];
-    if (n.type === 'scene') { n.chars = Array.isArray(n.chars) ? n.chars : []; n.open = n.open || 0; n.status = n.status || 0; }
+    if (n.type === 'scene') { n.chars = Array.isArray(n.chars) ? n.chars : []; n.open = n.open || 0; n.status = n.status || 0; n.heat = n.heat >= 1 && n.heat <= 5 ? n.heat : 0; }
   });
   return s;
 }
@@ -529,6 +562,53 @@ function renderTree() {
   if (!S.items.length) root.append(h('div', { class: 'emptykid' }, 'Nothing here yet. Start with a section (like “Part One” or “Arrival day”) or a scene below.'));
   root.querySelectorAll('textarea').forEach(grow);
   renderStat();
+  renderFlow();
+}
+function renderFlow() {
+  const flow = $('#flow');
+  $('#layout').classList.toggle('heaton', !!S.ui.heat);
+  if (!S.ui.heat) return flow.replaceChildren();
+  const bars = h('div', { class: 'bars' });
+  let num = 0, set = 0, total = 0, sum = 0, lastSec = null;
+  walk(S.items, (n, parent) => {
+    if (n.type !== 'scene') return;
+    num++; total++;
+    if (n.heat) { set++; sum += n.heat; }
+    if (bars.children.length && parent !== lastSec) bars.append(h('span', { class: 'gap', title: parent ? parent.title : '' }));
+    lastSec = parent;
+    bars.append(h('button', { class: 'hbar' + (n.heat ? '' : ' none') + (sceneMatches(n) ? '' : ' dim'), style: n.heat ? `--v:${n.heat};--hc:var(--h${n.heat})` : null,
+      title: `${num}. ${n.title || 'Untitled scene'} · ${n.heat ? HEAT[n.heat] : 'no intensity set'}${parent && parent.title ? ` (${parent.title})` : ''}`,
+      'aria-label': `Go to scene ${num}`, onclick: () => reveal(n.id) }));
+  });
+  setKids(flow,
+    h('div', { class: 'flow-h' }, h('b', null, 'Intensity flow'),
+      h('span', null, total ? `${set}/${total} scenes rated${set ? ` · average ${(sum / set).toFixed(1)}` : ''}` : 'No scenes yet'),
+      h('span', { class: 'flow-key' }, [1, 2, 3, 4, 5].map((v) => h('span', { title: HEAT_HINT[v] }, h('span', { class: 'hsw', style: `--hc:var(--h${v})` }), HEAT[v])))),
+    bars);
+}
+function reveal(id) {
+  const path = [];
+  const dig = (list) => { for (const n of list) { if (n.id === id) return true; if (n.children) { path.push(n); if (dig(n.children)) return true; path.pop(); } } return false; };
+  dig(S.items);
+  path.forEach((sec) => { sec.collapsed = false; });
+  save(); renderTree();
+  const el = $(`[data-id="${id}"]`);
+  if (el) { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash'); }
+}
+function openHeat(anchor, scene) {
+  closePop();
+  const choose = (v) => { snapshot(); scene.heat = v; save(); renderTree(); closePop(); };
+  pop = h('div', { class: 'pop menu' },
+    h('div', { class: 'pk-head' }, 'Intensity · press 1–5'),
+    [1, 2, 3, 4, 5].map((v) => h('button', { class: 'mi', onclick: () => choose(v) },
+      h('span', { class: 'hsw', style: `--hc:var(--h${v})` }), `${v} ${HEAT[v]}`, h('span', { class: 'k' }, HEAT_HINT[v]),
+      scene.heat === v ? icon('check') : null)),
+    h('div', { class: 'msep' }),
+    h('button', { class: 'mi', onclick: () => choose(0) }, h('span', { class: 'hsw' }), 'Not set'));
+  pop.addEventListener('keydown', (e) => { if (/^[0-5]$/.test(e.key)) choose(+e.key); });
+  place(pop, anchor);
+  pop.style.minWidth = '260px';
+  pop.querySelector('.mi').focus();
 }
 function renderList(list, into, depth, nums) {
   for (const n of list) {
@@ -593,7 +673,10 @@ function renderScene(n, num) {
     open === 0 && n.summary ? h('span', { class: 'peek', onclick: toggle, title: n.summary }, n.summary) : h('span', { class: 'fill', onclick: toggle }),
     plaques(n),
     dotsBtn(n));
-  const node = h('div', { class: 'node scene' + (sceneMatches(n) ? '' : ' dim'), 'data-id': n.id }, row);
+  const node = h('div', { class: 'node scene' + (sceneMatches(n) ? '' : ' dim'), 'data-id': n.id, 'data-h': n.heat || null, style: n.heat ? `--hc:var(--h${n.heat})` : null },
+    h('button', { class: 'heat-tab', title: n.heat ? `Intensity: ${n.heat} ${HEAT[n.heat]} (click to change)` : 'Set intensity', 'aria-label': 'Intensity',
+      onclick: (e) => openHeat(e.currentTarget, n) }),
+    row);
   if (open > 0) {
     const wc = words(n.details);
     node.append(h('div', { class: 'body' },
@@ -655,6 +738,8 @@ function renderBar() {
     h('span', { class: 'spacer' }),
     h('span', { class: 'seg-label' }, 'Show'),
     h('span', { class: 'seg', role: 'group', 'aria-label': 'Expand outline to' }, levels.map(([label, l]) => h('button', { title: `Expand everything to ${label.toLowerCase()}`, onclick: () => setLevel(l) }, label))),
+    h('button', { class: 'tb' + (S.ui.heat ? ' on' : ''), title: 'Show or hide intensity colours and the flow chart', 'aria-pressed': String(!!S.ui.heat),
+      onclick: () => { S.ui.heat = !S.ui.heat; save(); renderBar(); renderTree(); } }, h('span', { class: 'hsw', style: 'width:10px;height:10px;background:linear-gradient(90deg,var(--h1),var(--h2),var(--h3),var(--h4),var(--h5))' }), 'Heatmap'),
     h('span', { class: 'stat', id: 'stat' }),
     h('button', { class: 'tb', title: 'Undo (Ctrl/⌘+Z)', onclick: undo }, icon('undo')),
     h('button', { class: 'tb', title: 'Copy a readable outline to paste into an AI chat', onclick: openAiExport }, icon('ai'), 'Share with AI'),
@@ -967,7 +1052,7 @@ function outlineMarkdown(opt) {
   const indent = (t, pad) => t.trim().split('\n').map((l) => pad + l).join('\n');
   const out = [];
   out.push(`# ${S.title || 'Untitled novel'}`, '');
-  out.push('_Working scene outline for my novel, exported from Scene Flow. Sections and scenes are in story order; scenes are numbered in reading order. “Time” lines mark time passing between scenes._', '');
+  out.push('_Working scene outline for my novel, exported from Scene Flow. Sections and scenes are in story order; scenes are numbered in reading order. “Time” lines mark time passing between scenes. Intensity runs 1 (calm) to 5 (critical)._', '');
   if (S.characters.length) {
     out.push('## Characters', '');
     for (const c of S.characters) {
@@ -1003,7 +1088,7 @@ function outlineMarkdown(opt) {
         num++;
         out.push(`**Scene ${num}: ${n.title || 'Untitled scene'}**${opt.status ? ` · _${STATUS[n.status || 0]}_` : ''}`);
         const pov = charById(n.pov), pl = placeById(n.place);
-        const meta = [pov && `POV: ${pov.name}`, pl && `Place: ${pl.name}`, n.chars.length && `Present: ${names(n.chars)}`].filter(Boolean);
+        const meta = [n.heat && `Intensity: ${n.heat}/5 (${HEAT[n.heat]})`, pov && `POV: ${pov.name}`, pl && `Place: ${pl.name}`, n.chars.length && `Present: ${names(n.chars)}`].filter(Boolean);
         if (meta.length) out.push(`- ${meta.join(' · ')}`);
         if (n.summary.trim()) out.push(`- Summary: ${n.summary.trim().replace(/\s*\n\s*/g, ' ')}`);
         if (opt.details && n.details.trim()) out.push('- Details:', indent(n.details, '    '));
