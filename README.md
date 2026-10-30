@@ -14,7 +14,8 @@ Open `index.html` in any modern browser. There's nothing to install or build.
 - **Intensity heatmap**: click the coloured edge on the left of a scene to rate it 1–5, from Calm (blue) through Uneasy (green), Tense (yellow) and Intense (orange) to Critical (red). The **Heatmap** button turns the colours and the *Intensity flow* chart on or off; click a bar in the chart to jump to that scene.
 - **Status dot** on each scene: planned, drafted or done.
 - **Show** buttons expand the whole outline to Sections, Scenes, Summaries or Details.
-- **Drag** the ⠿ handle to reorder. Drop onto a section heading to move a scene into it. The ⋯ menu has Move up/down, Duplicate, Delete and Add below.
+- **Drag** the ⠿ handle to reorder. Drop onto a section heading to move a scene into it. The ⋯ menu has Move up/down, **Move to…** (pick any section, works on phones and tablets), Move to holding, Duplicate, Delete and Add below.
+- **Holding** sits below the outline for scenes you've set aside but might use later. Held scenes aren't numbered, counted or shown in the intensity flow. Move them back with Move to… or by dragging.
 - **Share with AI** turns your outline into plain text with names written out, ready to paste into an AI chat. You can leave out scene details, status or the weather table.
 - **Search** (`/`) and **Undo** (Ctrl/⌘+Z) for structural changes.
 

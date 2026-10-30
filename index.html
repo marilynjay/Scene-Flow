@@ -260,6 +260,14 @@ textarea::placeholder { color: var(--faint); }
 .flash { animation: flash 1.2s ease-out; }
 @keyframes flash { from { box-shadow: 0 0 0 3px var(--accent); } to { box-shadow: 0 0 0 3px transparent; } }
 
+/* holding area */
+.holding-wrap { margin-top: 22px; }
+.section.holding { background: var(--rail); border: 1px dashed var(--line-strong); border-radius: 6px; padding: 4px 6px 6px 2px; }
+.section.holding > .row .stitle { font: 600 13px/1.25 var(--ui); text-transform: uppercase; letter-spacing: .07em; color: var(--muted); cursor: default; }
+.section.holding > .row .hint { padding: 0; margin-left: 4px; }
+.section.holding > .kids { border-left: 0; margin-left: 0; padding-left: 4px; }
+.mi .ind { display: inline-block; flex: none; }
+
 /* drag and drop */
 .node.dragging { opacity: .35; }
 .row.drop-before { box-shadow: 0 -2px 0 var(--accent); }
@@ -306,7 +314,7 @@ textarea::placeholder { color: var(--faint); }
 .legend span { display: inline-flex; align-items: center; gap: 4px; }
 
 /* ---------- narrow screens ---------- */
-@media (max-width: 1280px) { .seg-label { display: none; } .search { flex-basis: 160px; } }
+@media (max-width: 1280px) { .seg-label, .stat { display: none; } .search { flex-basis: 160px; } }
 @media (max-width: 760px) {
   .layout, .layout.norail { grid-template-columns: minmax(0, 1fr); }
   .rail { display: none; }
@@ -333,6 +341,7 @@ textarea::placeholder { color: var(--faint); }
     <div class="flow" id="flow"></div>
     <div class="tree" id="tree"></div>
     <div class="rootadd" id="rootadd"></div>
+    <div class="tree holding-wrap" id="holding"></div>
   </main>
 </div>
 
@@ -437,6 +446,7 @@ const undoStack = [];
 
 function blankScene(title = '') { return { id: uid(), type: 'scene', title, summary: '', details: '', pov: null, place: null, chars: [], status: 0, open: 0 }; }
 function blankSection(title = '') { return { id: uid(), type: 'section', title, collapsed: false, children: [] }; }
+function blankHolding() { return { id: 'holding', type: 'section', title: 'Holding', collapsed: false, children: [] }; }
 function blankTime(label = '') { return { id: uid(), type: 'time', label, month: 0, weather: '' }; }
 
 function sample() {
@@ -463,6 +473,9 @@ function sample() {
       'Wet and windy, leaves turning · 46–58°F', 'Dark by 4:30, damp, fog · 40–50°F', 'Cold, short days, rare snow · 36–46°F',
     ],
     ui: { lib: { chars: true, places: true, climate: false }, heat: true },
+    holding: Object.assign(blankHolding(), { children: [
+      sc('Hollis’s dog', { summary: 'Comic beat: the dog steals Ellie’s scarf. Might fit after “The neighbour”, or cut.', pov: ellie.id, place: lane.id, chars: [ellie.id, hollis.id], heat: 1 }),
+    ] }),
     items: [
       Object.assign(blankSection('Arrival day'), { children: [
         Object.assign(blankTime('Day 1 · last week of August'), { month: 8 }),
@@ -499,7 +512,9 @@ function normalize(s) {
   s.ui = s.ui || {}; s.ui.lib = Object.assign({ chars: true, places: true, climate: false }, s.ui.lib);
   if (s.ui.heat == null) s.ui.heat = true;
   for (const lib of [s.characters, s.places]) for (const x of lib) { x.id = x.id || uid(); x.name = x.name || ''; x.color = x.color || PALETTE[0]; x.note = x.note || ''; }
-  walk(s.items, (n) => {
+  if (!s.holding || !Array.isArray(s.holding.children)) s.holding = blankHolding();
+  Object.assign(s.holding, { id: 'holding', type: 'section', title: 'Holding' });
+  walk([...s.items, s.holding], (n) => {
     n.id = n.id || uid();
     if (n.type === 'section') n.children = Array.isArray(n.children) ? n.children : [];
     if (n.type === 'scene') { n.chars = Array.isArray(n.chars) ? n.chars : []; n.open = n.open || 0; n.status = n.status || 0; n.heat = n.heat >= 1 && n.heat <= 5 ? n.heat : 0; }
@@ -526,7 +541,15 @@ function undo() {
 
 /* tree utilities */
 function walk(list, fn, parent = null, depth = 0) { for (const n of list) { fn(n, parent, list, depth); if (n.children) walk(n.children, fn, n, depth + 1); } }
-function find(id) { let r = null; walk(S.items, (n, p, l) => { if (n.id === id) r = { node: n, parent: p, list: l }; }); return r; }
+function find(id) {
+  let r = null;
+  const look = (n, p, l) => { if (n.id === id) r = { node: n, parent: p, list: l }; };
+  walk(S.items, look);
+  if (!r) walk([S.holding], look);
+  return r;
+}
+// The story outline plus the holding area, for changes that must reach every scene.
+const everything = () => [...S.items, S.holding];
 function containsId(node, id) { return !!node.children && node.children.some((c) => c.id === id || containsId(c, id)); }
 function scenesIn(node) { let c = 0; walk(node.children || [], (n) => { if (n.type === 'scene') c++; }); return c; }
 const charById = (id) => S.characters.find((c) => c.id === id);
@@ -560,7 +583,8 @@ function renderTree() {
   renderList(S.items, frag, 0, nums);
   root.replaceChildren(frag);
   if (!S.items.length) root.append(h('div', { class: 'emptykid' }, 'Nothing here yet. Start with a section (like “Part One” or “Arrival day”) or a scene below.'));
-  root.querySelectorAll('textarea').forEach(grow);
+  setKids($('#holding'), renderHolding(nums));
+  document.querySelectorAll('main textarea').forEach(grow);
   renderStat();
   renderFlow();
 }
@@ -589,7 +613,7 @@ function renderFlow() {
 function reveal(id) {
   const path = [];
   const dig = (list) => { for (const n of list) { if (n.id === id) return true; if (n.children) { path.push(n); if (dig(n.children)) return true; path.pop(); } } return false; };
-  dig(S.items);
+  dig(everything());
   path.forEach((sec) => { sec.collapsed = false; });
   save(); renderTree();
   const el = $(`[data-id="${id}"]`);
@@ -659,6 +683,25 @@ function renderSection(n, depth, nums) {
   return node;
 }
 
+function renderHolding(nums) {
+  const hd = S.holding, count = scenesIn(hd);
+  const row = h('div', { class: 'row' },
+    h('button', { class: 'caret-b' + (hd.collapsed ? '' : ' open'), 'aria-expanded': String(!hd.collapsed), title: 'Collapse / expand',
+      onclick: () => { hd.collapsed = !hd.collapsed; save(); renderTree(); } }, icon('right')),
+    h('span', { class: 'stitle' }, 'Holding'),
+    h('span', { class: 'count' }, count ? `${count}` : ''),
+    h('span', { class: 'hint' }, 'Set-aside scenes. Not numbered or counted in the story.'),
+    h('span', { class: 'acts' }, h('button', { onclick: () => addInside(hd, 'scene') }, '+ Scene')));
+  const node = h('div', { class: 'node section holding', 'data-id': 'holding' }, row);
+  if (!hd.collapsed) {
+    const kids = h('div', { class: 'kids' });
+    renderList(hd.children, kids, 1, nums);
+    if (!hd.children.length) kids.append(h('div', { class: 'emptykid' }, 'Nothing set aside. Use a scene’s ⋯ menu → Move to holding, or drag a scene onto this heading.'));
+    node.append(kids);
+  }
+  return node;
+}
+
 function renderScene(n, num) {
   const open = n.open || 0;
   const toggle = () => { n.open = open > 0 ? 0 : 1; save(); renderTree(); };
@@ -668,7 +711,7 @@ function renderScene(n, num) {
     h('button', { class: 'caret-b' + (open ? ' open' : '') + (hasText ? '' : ' dimmed'), title: open ? 'Hide description' : 'Show description', 'aria-expanded': String(!!open), onclick: toggle }, icon('right')),
     h('button', { class: 'st', 'data-s': n.status || 0, title: `Status: ${STATUS[n.status || 0]} (click to change)`, 'aria-label': `Status: ${STATUS[n.status || 0]}`,
       onclick: () => { n.status = ((n.status || 0) + 1) % 3; save(); renderTree(); } }),
-    h('span', { class: 'num' }, num),
+    h('span', { class: 'num', title: num ? null : 'In holding' }, num || '–'),
     editable('title', n.title, 'Untitled scene', (v) => { n.title = v; }),
     open === 0 && n.summary ? h('span', { class: 'peek', onclick: toggle, title: n.summary }, n.summary) : h('span', { class: 'fill', onclick: toggle }),
     plaques(n),
@@ -750,10 +793,11 @@ function renderStat() {
   const el = $('#stat'); if (!el) return;
   let total = 0, match = 0, done = 0;
   walk(S.items, (n) => { if (n.type === 'scene') { total++; if (sceneMatches(n)) match++; if (n.status === 2) done++; } });
-  el.textContent = filtering() ? `${match}/${total} scenes` : `${total} scenes · ${done} done`;
+  const held = scenesIn(S.holding);
+  el.textContent = filtering() ? `${match}/${total} scenes` : `${total} scenes · ${done} done${held ? ` · ${held} held` : ''}`;
 }
 function setLevel(l) {
-  walk(S.items, (n) => {
+  walk(everything(), (n) => {
     if (n.type === 'section') n.collapsed = l === 0 ? !n.children.some((c) => c.type === 'section') : false;
     if (n.type === 'scene') n.open = Math.max(0, l - 1);
   });
@@ -843,7 +887,7 @@ function removeLib(type, x) {
   snapshot();
   const lib = type === 'place' ? S.places : S.characters;
   lib.splice(lib.indexOf(x), 1);
-  walk(S.items, (n) => {
+  walk(everything(), (n) => {
     if (n.type !== 'scene') return;
     if (type === 'place' && n.place === x.id) n.place = null;
     if (type === 'char') { n.chars = n.chars.filter((c) => c !== x.id); if (n.pov === x.id) n.pov = null; }
@@ -922,14 +966,60 @@ function openMenu(anchor, n) {
   } else {
     items.push(mi('Add scene below', () => addAfter(n, 'scene')), mi('Add time marker below', () => addAfter(n, 'time')));
   }
+  const inHolding = hit.parent === S.holding;
   items.push(h('div', { class: 'msep' }),
     mi('Move up', () => shift(n, -1), { disabled: idx === 0 }),
     mi('Move down', () => shift(n, 1), { disabled: idx === hit.list.length - 1 }),
+    h('button', { class: 'mi', onclick: () => openMoveTo(anchor, n) }, 'Move to…', h('span', { class: 'k' }, '▸')),
+    inHolding ? null : mi('Move to holding', () => moveTo(n, 'holding')),
     mi('Duplicate', () => { snapshot(); hit.list.splice(idx + 1, 0, cloneNode(n)); save(); renderAll(); }),
     h('div', { class: 'msep' }),
     mi('Delete', () => removeNode(n), { danger: true }));
   pop = h('div', { class: 'pop menu' }, items);
   place(pop, anchor);
+}
+function openMoveTo(anchor, n) {
+  closePop();
+  const here = find(n.id); if (!here) return;
+  const current = here.parent ? here.parent.id : null;
+  const dests = [{ id: null, label: 'Top level of the outline', depth: 0 }];
+  walk(S.items, (x, p, l, d) => {
+    if (x.type === 'section' && x.id !== n.id && !containsId(n, x.id)) dests.push({ id: x.id, label: x.title || 'Untitled section', depth: d + 1 });
+  });
+  dests.push({ id: 'holding', label: 'Holding', depth: 0 });
+  const input = h('input', { class: 'pk-search', placeholder: 'Find a section…', 'aria-label': 'Find a section' });
+  const list = h('div', { class: 'pk-list' });
+  let visible = [];
+  const draw = () => {
+    const q = input.value.trim().toLowerCase();
+    visible = dests.filter((d) => !q || d.label.toLowerCase().includes(q));
+    setKids(list, h('div', { class: 'pk-head' }, `Move “${n.title || n.label || 'item'}” to the end of…`),
+      visible.map((d) => h('button', { class: 'pk-item', onclick: () => { closePop(); moveTo(n, d.id); } },
+        h('span', { class: 'chk' }, d.id === current ? icon('check') : null),
+        h('span', { class: 'ind', style: `width:${(q ? 0 : Math.max(0, d.depth - 1)) * 12}px` }),
+        h('span', { class: 'nm', style: d.id === 'holding' || d.id === null ? 'color:var(--muted)' : (d.depth === 1 ? 'font-weight:600' : null) }, d.label))),
+      visible.length ? null : h('div', { class: 'emptykid' }, 'No section with that name.'));
+  };
+  input.addEventListener('input', draw);
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closePop();
+    if (e.key === 'Enter' && visible.length) { e.preventDefault(); const d = visible[0]; closePop(); moveTo(n, d.id); }
+  });
+  pop = h('div', { class: 'pop picker' }, input, list);
+  draw();
+  place(pop, anchor);
+  input.focus();
+}
+function moveTo(n, destId) {
+  const src = find(n.id);
+  const dest = destId === null ? null : find(destId);
+  if (!src || (destId !== null && !dest) || (dest && (dest.node === n || containsId(n, destId)))) return;
+  snapshot();
+  src.list.splice(src.list.indexOf(n), 1);
+  if (dest) { dest.node.children.push(n); dest.node.collapsed = false; } else S.items.push(n);
+  save(); renderAll();
+  reveal(n.id);
+  toast(destId === 'holding' ? `Moved “${n.title || 'scene'}” to holding` : `Moved to ${dest ? `“${dest.node.title || 'Untitled section'}”` : 'the top level'}`, 'Undo', undo);
 }
 function newOf(type) { return type === 'scene' ? blankScene() : type === 'time' ? blankTime() : blankSection(); }
 function focusNew(id) {
@@ -958,7 +1048,7 @@ function removeNode(n) {
 
 /* ================= drag and drop ================= */
 let dragId = null, dropAt = null;
-const tree = $('#tree');
+const tree = $('main');
 function clearDrop() { tree.querySelectorAll('.drop-before,.drop-after,.drop-into').forEach((r) => r.classList.remove('drop-before', 'drop-after', 'drop-into')); }
 tree.addEventListener('dragstart', (e) => {
   const node = e.target.closest && e.target.closest('.node');
@@ -979,7 +1069,8 @@ tree.addEventListener('dragover', (e) => {
   const r = row.getBoundingClientRect(), y = (e.clientY - r.top) / r.height;
   const tgt = find(node.dataset.id);
   let pos;
-  if (tgt && tgt.node.type === 'section') pos = y < 0.3 ? 'before' : (tgt.node.collapsed && y > 0.75 ? 'after' : 'into');
+  if (tgt && tgt.node === S.holding) pos = 'into';
+  else if (tgt && tgt.node.type === 'section') pos = y < 0.3 ? 'before' : (tgt.node.collapsed && y > 0.75 ? 'after' : 'into');
   else pos = y < 0.5 ? 'before' : 'after';
   clearDrop();
   row.classList.add('drop-' + pos);
@@ -1072,7 +1163,7 @@ function outlineMarkdown(opt) {
     out.push('');
   }
   out.push('## Outline', '');
-  let num = 0;
+  let num = 0, held = false;
   const list = (items, depth) => {
     for (const n of items) {
       if (n.type === 'section') {
@@ -1085,8 +1176,8 @@ function outlineMarkdown(opt) {
         const when = [n.label, month && `(${month})`].filter(Boolean).join(' ');
         out.push(`> **Time:** ${when || 'time passes'}${weather ? ` · Weather: ${weather}` : ''}`, '');
       } else if (n.type === 'scene') {
-        num++;
-        out.push(`**Scene ${num}: ${n.title || 'Untitled scene'}**${opt.status ? ` · _${STATUS[n.status || 0]}_` : ''}`);
+        if (!held) num++;
+        out.push(`**${held ? 'Held scene' : `Scene ${num}`}: ${n.title || 'Untitled scene'}**${opt.status ? ` · _${STATUS[n.status || 0]}_` : ''}`);
         const pov = charById(n.pov), pl = placeById(n.place);
         const meta = [n.heat && `Intensity: ${n.heat}/5 (${HEAT[n.heat]})`, pov && `POV: ${pov.name}`, pl && `Place: ${pl.name}`, n.chars.length && `Present: ${names(n.chars)}`].filter(Boolean);
         if (meta.length) out.push(`- ${meta.join(' · ')}`);
@@ -1097,11 +1188,16 @@ function outlineMarkdown(opt) {
     }
   };
   list(S.items, 0);
+  if (opt.holding && S.holding.children.length) {
+    out.push('## Holding (set aside, not currently in the story)', '');
+    held = true;
+    list(S.holding.children, 1);
+  }
   return out.join('\n').replace(/\n{3,}/g, '\n\n').trim() + '\n';
 }
 function openAiExport() {
   closePop();
-  const opt = { details: true, status: true, climate: true };
+  const opt = { details: true, status: true, climate: true, holding: true };
   const ta = h('textarea', { id: 'ai-md', spellcheck: 'false', 'aria-label': 'Outline as text' });
   const words = h('span', { class: 'stat' });
   const refresh = () => { ta.value = outlineMarkdown(opt); words.textContent = `${ta.value.split(/\s+/).length.toLocaleString()} words`; };
@@ -1111,7 +1207,7 @@ function openAiExport() {
     h('div', { class: 'modal', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'ai-h' },
       h('h2', { id: 'ai-h' }, 'Share with AI'),
       h('p', null, 'A plain-text version of your outline with names written out, so an AI can follow it easily. Copy it and paste it into a chat, then ask your question underneath. This is for reading only; use Backup to save or restore.'),
-      h('div', { class: 'btns' }, box('details', 'Scene details'), box('status', 'Status'), box('climate', 'Weather table')),
+      h('div', { class: 'btns' }, box('details', 'Scene details'), box('status', 'Status'), box('climate', 'Weather table'), box('holding', 'Holding scenes')),
       ta,
       h('div', { class: 'btns' },
         h('button', { class: 'btn primary', onclick: async () => {
