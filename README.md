@@ -14,6 +14,7 @@ Open `index.html` in any modern browser. There's nothing to install or build.
 - **Status dot** on each scene: planned, drafted or done.
 - **Show** buttons expand the whole outline to Sections, Scenes, Summaries or Details.
 - **Drag** the ⠿ handle to reorder. Drop onto a section heading to move a scene into it. The ⋯ menu has Move up/down, Duplicate, Delete and Add below.
+- **Share with AI** turns your outline into plain text with names written out, ready to paste into an AI chat. You can leave out scene details, status or the weather table.
 - **Search** (`/`) and **Undo** (Ctrl/⌘+Z) for structural changes.
 
 ## Saving

@@ -272,6 +272,8 @@ textarea::placeholder { color: var(--faint); }
 .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--panel); }
 .btn.primary:hover { color: var(--panel); filter: brightness(1.08); }
 .btn.warn { border-color: var(--danger); color: var(--danger); }
+.opt { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); font-size: 12px; cursor: pointer; }
+.modal .btns { align-items: center; }
 .legend { display: flex; flex-wrap: wrap; gap: 4px 12px; color: var(--muted); font-size: var(--fs-s); padding: 6px 4px 0; border-top: 1px solid var(--line); margin-top: 6px; }
 .legend span { display: inline-flex; align-items: center; gap: 4px; }
 
@@ -316,6 +318,7 @@ const ICONS = {
   people: '<circle cx="6" cy="5.2" r="2.4"/><path d="M1.6 13.8c0-2.4 2-4.3 4.4-4.3s4.4 1.9 4.4 4.3"/><path d="M10.4 3a2.3 2.3 0 0 1 0 4.4M12 9.8c1.5.6 2.4 2.1 2.4 4"/>',
   clock: '<circle cx="8" cy="8" r="6.3"/><path d="M8 4.6V8l2.4 1.5"/>',
   cloud: '<path d="M4.6 12.6h6.9a2.9 2.9 0 0 0 .3-5.8 3.9 3.9 0 0 0-7.5 1 2.4 2.4 0 0 0 .3 4.8z"/>',
+  ai: '<path d="M8 1.8l1.5 3.9 3.9 1.5-3.9 1.5L8 12.6 6.5 8.7 2.6 7.2l3.9-1.5z"/><path d="M12.6 10.6l.6 1.5 1.5.6-1.5.6-.6 1.5-.6-1.5-1.5-.6 1.5-.6z"/>',
   plus: '<path d="M8 3.2v9.6M3.2 8h9.6"/>',
   search: '<circle cx="7" cy="7" r="4.3"/><path d="M10.3 10.3L14 14"/>',
   filter: '<path d="M2.2 3h11.6L9.4 8.4v4.4l-2.8-1.4v-3z"/>',
@@ -654,6 +657,7 @@ function renderBar() {
     h('span', { class: 'seg', role: 'group', 'aria-label': 'Expand outline to' }, levels.map(([label, l]) => h('button', { title: `Expand everything to ${label.toLowerCase()}`, onclick: () => setLevel(l) }, label))),
     h('span', { class: 'stat', id: 'stat' }),
     h('button', { class: 'tb', title: 'Undo (Ctrl/⌘+Z)', onclick: undo }, icon('undo')),
+    h('button', { class: 'tb', title: 'Copy a readable outline to paste into an AI chat', onclick: openAiExport }, icon('ai'), 'Share with AI'),
     h('button', { class: 'tb', title: 'Back up or restore your outline', onclick: openBackup }, icon('save'), 'Backup'));
   renderStat();
 }
@@ -947,6 +951,94 @@ function openBackup() {
         h('span', { class: 'spacer' }),
         replaceBtn, file),
       h('div', { class: 'btns' }, h('span', { class: 'spacer' }), h('button', { class: 'btn', onclick: () => scrim.remove() }, 'Close'))));
+  document.body.append(scrim);
+}
+
+/* ================= share with AI ================= */
+function outlineMarkdown(opt) {
+  const names = (ids) => ids.map(charById).filter(Boolean).map((c) => c.name || '(unnamed)').join(', ');
+  const usage = new Map(), povs = new Map();
+  walk(S.items, (n) => {
+    if (n.type !== 'scene') return;
+    new Set([...n.chars, n.pov, n.place].filter(Boolean)).forEach((id) => usage.set(id, (usage.get(id) || 0) + 1));
+    if (n.pov) povs.set(n.pov, (povs.get(n.pov) || 0) + 1);
+  });
+  const scenes = (k) => `${k} scene${k === 1 ? '' : 's'}`;
+  const indent = (t, pad) => t.trim().split('\n').map((l) => pad + l).join('\n');
+  const out = [];
+  out.push(`# ${S.title || 'Untitled novel'}`, '');
+  out.push('_Working scene outline for my novel, exported from Scene Flow. Sections and scenes are in story order; scenes are numbered in reading order. “Time” lines mark time passing between scenes._', '');
+  if (S.characters.length) {
+    out.push('## Characters', '');
+    for (const c of S.characters) {
+      const stats = [`in ${scenes(usage.get(c.id) || 0)}`, povs.get(c.id) ? `POV in ${povs.get(c.id)}` : null].filter(Boolean).join(', ');
+      out.push(`- **${c.name || '(unnamed)'}** (${stats})${c.note ? ': ' + c.note.trim().replace(/\s*\n\s*/g, ' ') : ''}`);
+    }
+    out.push('');
+  }
+  if (S.places.length) {
+    out.push('## Places', '');
+    for (const p of S.places) out.push(`- **${p.name || '(unnamed)'}** (in ${scenes(usage.get(p.id) || 0)})${p.note ? ': ' + p.note.trim().replace(/\s*\n\s*/g, ' ') : ''}`);
+    out.push('');
+  }
+  if (opt.climate && S.climate.some(Boolean)) {
+    out.push('## Typical weather by month', '');
+    S.climate.forEach((w, i) => { if (w) out.push(`- ${MONTHS[i]}: ${w}`); });
+    out.push('');
+  }
+  out.push('## Outline', '');
+  let num = 0;
+  const list = (items, depth) => {
+    for (const n of items) {
+      if (n.type === 'section') {
+        const t = n.title || 'Untitled section';
+        out.push(depth < 4 ? `${'#'.repeat(depth + 3)} ${t}` : `**${t}**`, '');
+        list(n.children, depth + 1);
+      } else if (n.type === 'time') {
+        const month = n.month ? MONTHS[n.month - 1] : '';
+        const weather = n.weather || (n.month ? S.climate[n.month - 1] : '');
+        const when = [n.label, month && `(${month})`].filter(Boolean).join(' ');
+        out.push(`> **Time:** ${when || 'time passes'}${weather ? ` · Weather: ${weather}` : ''}`, '');
+      } else if (n.type === 'scene') {
+        num++;
+        out.push(`**Scene ${num}: ${n.title || 'Untitled scene'}**${opt.status ? ` · _${STATUS[n.status || 0]}_` : ''}`);
+        const pov = charById(n.pov), pl = placeById(n.place);
+        const meta = [pov && `POV: ${pov.name}`, pl && `Place: ${pl.name}`, n.chars.length && `Present: ${names(n.chars)}`].filter(Boolean);
+        if (meta.length) out.push(`- ${meta.join(' · ')}`);
+        if (n.summary.trim()) out.push(`- Summary: ${n.summary.trim().replace(/\s*\n\s*/g, ' ')}`);
+        if (opt.details && n.details.trim()) out.push('- Details:', indent(n.details, '    '));
+        out.push('');
+      }
+    }
+  };
+  list(S.items, 0);
+  return out.join('\n').replace(/\n{3,}/g, '\n\n').trim() + '\n';
+}
+function openAiExport() {
+  closePop();
+  const opt = { details: true, status: true, climate: true };
+  const ta = h('textarea', { id: 'ai-md', spellcheck: 'false', 'aria-label': 'Outline as text' });
+  const words = h('span', { class: 'stat' });
+  const refresh = () => { ta.value = outlineMarkdown(opt); words.textContent = `${ta.value.split(/\s+/).length.toLocaleString()} words`; };
+  const box = (key, label) => h('label', { class: 'opt' },
+    h('input', { type: 'checkbox', id: 'ai-' + key, checked: opt[key], onchange: (e) => { opt[key] = e.target.checked; refresh(); } }), label);
+  const scrim = h('div', { class: 'scrim', onclick: (e) => { if (e.target === scrim) scrim.remove(); } },
+    h('div', { class: 'modal', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'ai-h' },
+      h('h2', { id: 'ai-h' }, 'Share with AI'),
+      h('p', null, 'A plain-text version of your outline with names written out, so an AI can follow it easily. Copy it and paste it into a chat, then ask your question underneath. This is for reading only; use Backup to save or restore.'),
+      h('div', { class: 'btns' }, box('details', 'Scene details'), box('status', 'Status'), box('climate', 'Weather table')),
+      ta,
+      h('div', { class: 'btns' },
+        h('button', { class: 'btn primary', onclick: async () => {
+          try { await navigator.clipboard.writeText(ta.value); toast('Copied. Paste it into your AI chat.'); } catch (err) { ta.focus(); ta.select(); toast('Press Ctrl/⌘+C to copy'); }
+        } }, 'Copy'),
+        h('button', { class: 'btn', onclick: () => {
+          const a = h('a', { href: URL.createObjectURL(new Blob([ta.value], { type: 'text/markdown' })), download: `${(S.title || 'outline').replace(/[^\w\- ]+/g, '').trim() || 'outline'}.md` });
+          document.body.append(a); a.click(); a.remove();
+        } }, 'Download .md'),
+        h('span', { class: 'spacer' }), words,
+        h('button', { class: 'btn', onclick: () => scrim.remove() }, 'Close'))));
+  refresh();
   document.body.append(scrim);
 }
 
