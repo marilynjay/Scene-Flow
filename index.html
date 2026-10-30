@@ -323,6 +323,19 @@ textarea::placeholder { color: var(--faint); }
 .fc-mode button.on { background: var(--accent); color: var(--panel); }
 .filterchip .fc-x { display: grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; }
 .filterchip .fc-x:hover { background: var(--panel); }
+.pk-row { display: flex; align-items: center; gap: 6px; min-height: 26px; padding: 2px 4px 2px 8px; border-radius: 4px; }
+.pk-row:hover { background: var(--hover); }
+.pk-name { flex: 1; min-width: 0; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 2px 0; }
+.pk-name:hover { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
+.pk-tag { font: 600 9.5px/1 var(--ui); letter-spacing: .06em; padding: 3px 5px; border-radius: 3px; background: var(--accent-soft); color: var(--accent); flex: none; }
+.pk-x { opacity: .55; }
+.pk-row:hover .pk-x, .pk-x:focus-visible { opacity: 1; }
+.pk-back { align-self: flex-start; padding: 3px 6px; color: var(--accent); font-size: var(--fs-s); border-radius: 4px; }
+.pk-back:hover { background: var(--hover); }
+.sheet .pk-row { min-height: 42px; font-size: 15px; }
+.sheet .pk-row .av { width: 22px; height: 22px; font-size: 10px; }
+.sheet .pk-x { opacity: .8; width: 32px; height: 32px; }
+.sheet .pk-back { font-size: 14px; padding: 6px 8px; }
 .pk-mode { color: var(--muted); font-size: 12px; cursor: pointer; }
 .pk-mode input { margin: 0 4px 0 2px; }
 .plq .t { overflow: hidden; text-overflow: ellipsis; min-width: 0; color: var(--fg); }
@@ -457,7 +470,7 @@ html { touch-action: manipulation; }
   .rail-close { display: flex; }
   .bar { position: static; }
   /* Home-screen app: iOS fades and blurs the strip just under the status bar, so start the top bar below it. */
-  @media (display-mode: standalone) { .bar { padding-top: 26px; } }
+  @media (display-mode: standalone) { .bar { padding-top: 26px; } .pop.sheet { padding-top: calc(28px + env(safe-area-inset-top, 0px)); } }
   .seg-label, .stat { display: none; }
 }
 @media (max-width: 600px) {
@@ -1402,20 +1415,44 @@ function openPicker(anchor, kind, scene) {
     if (multi) input.focus();
   };
   let visible = [], hi = 0;
+  // Cast and threads open on who/what is already in the scene; the full list is one tap away.
+  let adding = !multi || !scene[kind].length;
+  const startAdding = () => { adding = true; input.hidden = false; hi = 0; draw(); if (!TOUCH) input.focus(); };
+  const libType = kind === 'threads' ? 'thread' : 'char';
+  const sceneCount = (id) => { let k = 0; walk(S.items, (n) => { if (n.type === 'scene' && (n.chars.includes(id) || n.threads.includes(id) || n.pov === id)) k++; }); return k; };
+  const badge = (x) => kind === 'place' ? h('span', { class: 'swatch sq', style: `--c:${x.color}` }) : kind === 'threads' ? h('span', { class: 'swatch thr', style: `--c:${x.color}` }) : h('span', { class: 'av', style: `--c:${x.color}` }, initials(x.name));
   const opts = () => [...list.querySelectorAll('.pk-item')];
   const mark = () => opts().forEach((b, i) => b.classList.toggle('kb', i === hi));
   // Names that start with what was typed come first, then a later word that starts with it, then anything containing it.
   const rank = (x, q) => { const n = x.name.toLowerCase(); return n.startsWith(q) ? 0 : n.split(/[\s(]+/).some((w) => w.startsWith(q)) ? 1 : 2; };
   const draw = () => {
+    if (multi && !adding) {
+      input.hidden = true;
+      const here = scene[kind].map((id) => lib.find((x) => x.id === id)).filter(Boolean);
+      setKids(list,
+        h('div', { class: 'pk-head' }, `${kind === 'threads' ? 'Plot threads' : 'In this scene'} · ${here.length}`),
+        here.map((x) => h('div', { class: 'pk-row' },
+          badge(x),
+          h('button', { class: 'pk-name', title: `Open ${x.name || 'details'}`, onclick: () => openDetails(x, libType, sceneCount(x.id)) }, x.name || '(unnamed)'),
+          kind === 'chars' && scene.pov === x.id ? h('span', { class: 'pk-tag', title: 'Point of view' }, 'POV') : null,
+          h('button', { class: 'ib pk-x', title: 'Remove from this scene', 'aria-label': `Remove ${x.name}`, onclick: () => {
+            snapshot(); scene[kind] = scene[kind].filter((id) => id !== x.id); save(); renderTree(); renderRail();
+            if (!scene[kind].length) startAdding(); else draw();
+          } }, icon('x')))),
+        h('button', { class: 'pk-item add', onclick: startAdding }, h('span', { class: 'chk' }, icon('plus')), h('span', { class: 'nm' }, kind === 'threads' ? 'Add plot threads' : 'Add characters')));
+      hi = 0; mark();
+      return;
+    }
     const q = input.value.trim().toLowerCase();
     visible = lib.filter((x) => x.name.toLowerCase().includes(q));
     if (q) visible.sort((a, b) => rank(a, q) - rank(b, q));
     setKids(list, 
+      multi && scene[kind].length ? h('button', { class: 'pk-back', onclick: () => { adding = false; input.value = ''; draw(); } }, '‹ ', kind === 'threads' ? 'Back to this scene’s threads' : 'Back to who’s in this scene') : null,
       h('div', { class: 'pk-head' }, kind === 'pov' ? 'Point of view' : kind === 'place' ? 'Place' : kind === 'threads' ? 'Plot threads' : 'Characters present'),
       !multi && !q ? h('button', { class: 'pk-item', onclick: () => choose(null) }, h('span', { class: 'chk' }, !scene[kind] ? icon('check') : null), h('span', { class: 'nm', style: 'color:var(--muted)' }, 'None')) : null,
       visible.map((x) => h('button', { class: 'pk-item', role: 'option', 'aria-selected': String(isSel(x)), onclick: () => choose(x) },
         h('span', { class: 'chk' }, isSel(x) ? icon('check') : null),
-        kind === 'place' ? h('span', { class: 'swatch sq', style: `--c:${x.color}` }) : kind === 'threads' ? h('span', { class: 'swatch thr', style: `--c:${x.color}` }) : h('span', { class: 'av', style: `--c:${x.color}` }, initials(x.name)),
+        badge(x),
         h('span', { class: 'nm' }, x.name || '(unnamed)'))),
       q && !lib.some((x) => x.name.toLowerCase() === q) ? h('button', { class: 'pk-item add', onclick: create }, h('span', { class: 'chk' }, icon('plus')), h('span', { class: 'nm' }, `Add “${input.value.trim()}”`)) : null);
     hi = Math.max(0, Math.min(hi, opts().length - 1));
@@ -1439,7 +1476,7 @@ function openPicker(anchor, kind, scene) {
   pop = h('div', { class: 'pop picker' }, input, list);
   draw();
   place(pop, anchor);
-  if (!TOUCH) input.focus();
+  if (!TOUCH && adding) input.focus();
 }
 
 function openFilterPicker(anchor) {
