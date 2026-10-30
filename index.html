@@ -285,6 +285,32 @@ textarea::placeholder { color: var(--faint); }
 .tbars { display: inline-flex; gap: 2px; flex: none; }
 .tbar { width: 4px; height: 12px; border-radius: 2px; background: var(--c); }
 .swatch.thr { border-radius: 2px; width: 6px; height: 14px; }
+.qbadge { display: inline-flex; align-items: center; gap: 3px; height: 18px; padding: 0 6px 0 4px; border-radius: 9px; flex: none;
+  background: var(--time-soft); color: var(--time); border: 1px solid color-mix(in srgb, var(--time) 40%, transparent); font: 600 10.5px/1 var(--mono); }
+.qbadge:hover { border-color: var(--time); }
+.qcount { display: inline-grid; place-items: center; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--time); color: var(--panel); font: 600 10px/1 var(--mono); }
+.body-acts { display: flex; gap: 6px; flex-wrap: wrap; }
+.todos { display: flex; flex-direction: column; gap: 1px; margin: 2px 0 2px 2px; padding: 5px 8px 6px; border-radius: 6px; background: var(--time-soft); border: 1px solid color-mix(in srgb, var(--time) 25%, transparent); }
+.todos-h { display: flex; align-items: center; gap: 4px; font: 600 10px/1.2 var(--ui); text-transform: uppercase; letter-spacing: .08em; color: var(--time); margin-bottom: 2px; }
+.todo { display: flex; align-items: flex-start; gap: 6px; min-height: 22px; }
+.todo input[type=checkbox] { margin: 4px 0 0; accent-color: var(--ok); flex: none; }
+.todo .ed { flex: 1; min-width: 0; padding: 2px 3px; font-size: 12.5px; line-height: 1.4; }
+.todo.done .ed { color: var(--faint); text-decoration: line-through; }
+.todo .ib { opacity: 0; margin-top: 1px; }
+.todo:hover .ib, .todo:focus-within .ib { opacity: 1; }
+@media (hover: none) { .todo .ib { opacity: .6; } }
+.todo-add { display: flex; align-items: center; gap: 6px; height: 24px; color: var(--time); padding-left: 1px; }
+.todo-add input { flex: 1; min-width: 0; border: 0; background: none; outline: 0; font-size: 12.5px; color: var(--fg); }
+.todo-add input::placeholder { color: color-mix(in srgb, var(--time) 60%, var(--muted)); }
+@media (hover: none) { .todo-add input, .todo .ed { font-size: 16px; } }
+.qlist { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding: 2px; }
+.qgroup { display: flex; flex-direction: column; gap: 4px; }
+.qlist .todos-h { display: none; }
+.qgroup h3 { margin: 0; font: 600 13px/1.3 var(--ui); }
+.qscene { display: inline-flex; align-items: center; gap: 6px; color: var(--fg); text-align: left; }
+.qscene:hover { color: var(--accent); }
+.qscene .num { min-width: 0; }
+.qicon { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--time-soft); color: var(--time); }
 .tchips { display: flex; flex-wrap: wrap; gap: 4px; padding: 2px 0 0 5px; }
 .tchip { display: inline-flex; align-items: center; gap: 5px; height: 20px; padding: 0 8px 0 6px; border-radius: 10px; font-size: var(--fs-s); color: var(--fg);
   background: color-mix(in srgb, var(--c) 14%, var(--panel)); border: 1px solid color-mix(in srgb, var(--c) 40%, var(--line)); }
@@ -475,6 +501,7 @@ const ICONS = {
   cloud: '<path d="M4.6 12.6h6.9a2.9 2.9 0 0 0 .3-5.8 3.9 3.9 0 0 0-7.5 1 2.4 2.4 0 0 0 .3 4.8z"/>',
   ai: '<path d="M8 1.8l1.5 3.9 3.9 1.5-3.9 1.5L8 12.6 6.5 8.7 2.6 7.2l3.9-1.5z"/><path d="M12.6 10.6l.6 1.5 1.5.6-1.5.6-.6 1.5-.6-1.5-1.5-.6 1.5-.6z"/>',
   thread: '<path d="M1.8 11.5c2.2 0 2.6-7 5.2-7s2.4 7 5 7"/><circle cx="13.6" cy="11.5" r="1.4"/>',
+  q: '<circle cx="8" cy="8" r="6.3"/><path d="M6.1 6.2a2 2 0 0 1 3.9.6c0 1.4-2 1.6-2 3"/><circle cx="8" cy="11.9" r=".5" fill="currentColor"/>',
   plus: '<path d="M8 3.2v9.6M3.2 8h9.6"/>',
   search: '<circle cx="7" cy="7" r="4.3"/><path d="M10.3 10.3L14 14"/>',
   filter: '<path d="M2.2 3h11.6L9.4 8.4v4.4l-2.8-1.4v-3z"/>',
@@ -566,7 +593,7 @@ let query = '';
 let railOpen = true;
 const undoStack = [];
 
-function blankScene(title = '') { return { id: uid(), type: 'scene', title, summary: '', details: '', pov: null, place: null, chars: [], threads: [], status: 0, open: 0 }; }
+function blankScene(title = '') { return { id: uid(), type: 'scene', title, summary: '', details: '', pov: null, place: null, chars: [], threads: [], todos: [], status: 0, open: 0 }; }
 function blankSection(title = '') { return { id: uid(), type: 'section', title, collapsed: false, children: [] }; }
 function blankHolding() { return { id: 'holding', type: 'section', title: 'Holding', collapsed: false, children: [] }; }
 function blankTime(label = '') { return { id: uid(), type: 'time', label, month: 0, weather: '' }; }
@@ -708,6 +735,8 @@ function normalize(s) {
   s.characters = Array.isArray(s.characters) ? s.characters : [];
   s.places = Array.isArray(s.places) ? s.places : [];
   s.threads = Array.isArray(s.threads) ? s.threads : [];
+  const fixTodos = (l) => (Array.isArray(l) ? l : []).filter((t) => t && typeof t === 'object').map((t) => ({ id: t.id || uid(), text: String(t.text || ''), done: !!t.done }));
+  s.todos = fixTodos(s.todos);
   s.climate = Array.from({ length: 12 }, (_, i) => (s.climate && s.climate[i]) || '');
   s.ui = s.ui || {}; s.ui.lib = Object.assign({ chars: true, places: true, threads: true, climate: false }, s.ui.lib);
   if (s.ui.heat == null) s.ui.heat = true;
@@ -724,7 +753,7 @@ function normalize(s) {
   walk([...s.items, s.holding], (n) => {
     n.id = n.id || uid();
     if (n.type === 'section') n.children = Array.isArray(n.children) ? n.children : [];
-    if (n.type === 'scene') { n.chars = Array.isArray(n.chars) ? n.chars : []; n.threads = Array.isArray(n.threads) ? n.threads : []; n.open = n.open || 0; n.status = n.status || 0; n.heat = n.heat >= 1 && n.heat <= 5 ? n.heat : 0; }
+    if (n.type === 'scene') { n.chars = Array.isArray(n.chars) ? n.chars : []; n.threads = Array.isArray(n.threads) ? n.threads : []; n.todos = fixTodos(n.todos); n.open = n.open || 0; n.status = n.status || 0; n.heat = n.heat >= 1 && n.heat <= 5 ? n.heat : 0; }
   });
   return s;
 }
@@ -761,7 +790,7 @@ function containsId(node, id) { return !!node.children && node.children.some((c)
 function scenesIn(node) { let c = 0; walk(node.children || [], (n) => { if (n.type === 'scene') c++; }); return c; }
 const charById = (id) => S.characters.find((c) => c.id === id);
 const placeById = (id) => S.places.find((p) => p.id === id);
-function cloneNode(n) { const c = JSON.parse(JSON.stringify(n)); walk([c], (x) => { x.id = uid(); }); return c; }
+function cloneNode(n) { const c = JSON.parse(JSON.stringify(n)); walk([c], (x) => { x.id = uid(); (x.todos || []).forEach((t) => { t.id = uid(); }); }); return c; }
 
 function sceneMatches(s) {
   if (filter) {
@@ -771,7 +800,7 @@ function sceneMatches(s) {
   }
   if (query) {
     const q = query.toLowerCase();
-    if (![s.title, s.summary, s.details].some((x) => (x || '').toLowerCase().includes(q))) return false;
+    if (![s.title, s.summary, s.details, ...s.todos.map((t) => t.text)].some((x) => (x || '').toLowerCase().includes(q))) return false;
   }
   return true;
 }
@@ -954,6 +983,8 @@ function renderScene(n, num) {
     h('span', { class: 'num', title: num ? null : 'In holding' }, num || '–'),
     editable('title', n.title, 'Untitled scene', (v) => { n.title = v; }),
     open === 0 && n.summary ? h('span', { class: 'peek', onclick: toggle, title: n.summary }, n.summary) : h('span', { class: 'fill', onclick: toggle }),
+    openCount(n) ? h('button', { class: 'qbadge', title: n.todos.filter((t) => !t.done).map((t) => '• ' + t.text).join('\n'), 'aria-label': `${openCount(n)} open questions`,
+      onclick: () => { n.open = Math.max(n.open || 0, 1); save(); renderTree(); } }, icon('q'), openCount(n)) : null,
     plaques(n),
     dotsBtn(n));
   const node = h('div', { class: 'node scene' + (sceneMatches(n) ? '' : ' dim'), 'data-id': n.id, 'data-h': n.heat || null, style: n.heat ? `--hc:var(--h${n.heat})` : null },
@@ -966,11 +997,74 @@ function renderScene(n, num) {
       n.threads.length ? h('div', { class: 'tchips' }, n.threads.map(threadById).filter(Boolean).map((t) =>
         h('button', { class: 'tchip', style: `--c:${t.color}`, title: `Show only scenes in “${t.name}”`, onclick: () => { filter = { type: 'thread', id: t.id }; S.ui.only = true; save(); renderAll(); } }, t.name))) : null,
       area('summary', n.summary, 'Short description of this scene…', (v) => { n.summary = v; }),
-      h('button', { class: 'more' + (open > 1 ? ' on' : ''), 'aria-expanded': String(open > 1), onclick: () => { n.open = open > 1 ? 1 : 2; save(); renderTree(); } },
-        icon('right'), 'Details', wc ? h('span', { class: 'wc' }, `${wc}w`) : null),
-      open > 1 ? area('details', n.details, 'Beats, dialogue fragments, research, things to remember…', (v) => { n.details = v; }) : null));
+      h('div', { class: 'body-acts' },
+        h('button', { class: 'more' + (open > 1 ? ' on' : ''), 'aria-expanded': String(open > 1), onclick: () => { n.open = open > 1 ? 1 : 2; save(); renderTree(); } },
+          icon('right'), 'Details', wc ? h('span', { class: 'wc' }, `${wc}w`) : null),
+        n.todos.length ? null : h('button', { class: 'more', onclick: () => { askingIn.add(n.id); renderTree(); focusQuestion(n.id); } }, icon('plus'), 'Open question')),
+      open > 1 ? area('details', n.details, 'Beats, dialogue fragments, research, things to remember…', (v) => { n.details = v; }) : null,
+      n.todos.length || askingIn.has(n.id) ? todoList(n.todos, n.id, () => renderTree()) : null));
   }
   return node;
+}
+
+const openCount = (n) => n.todos.filter((t) => !t.done).length;
+const askingIn = new Set();   // scenes showing an empty "add a question" box
+function focusQuestion(key) { const f = () => $(`.todo-add[data-for="${key}"] input`)?.focus(); f(); setTimeout(f); }
+// A checklist of open questions. `key` identifies where it lives so focus can return to its add box after a redraw.
+function todoList(todos, key, redraw, hideDone = false) {
+  const add = h('input', { placeholder: 'Add an open question… (Enter)', 'aria-label': 'Add an open question',
+    onkeydown: (e) => {
+      if (e.key === 'Escape') { askingIn.delete(key); redraw(); }
+      if (e.key !== 'Enter' || !add.value.trim()) return;
+      e.preventDefault();
+      snapshot(); todos.push({ id: uid(), text: add.value.trim(), done: false }); save();
+      redraw(); renderBar(); focusQuestion(key);
+    } });
+  return h('div', { class: 'todos' },
+    h('div', { class: 'todos-h' }, icon('q'), 'Open questions'),
+    todos.filter((t) => !(hideDone && t.done)).map((t) => h('div', { class: 'todo' + (t.done ? ' done' : '') },
+      h('input', { type: 'checkbox', checked: t.done, 'aria-label': t.done ? 'Mark as open' : 'Mark as answered',
+        onchange: (e) => { t.done = e.target.checked; save(); redraw(); renderBar(); } }),
+      editable('ttext', t.text, 'Question', (v) => { t.text = v; }),
+      h('button', { class: 'ib', title: 'Delete', 'aria-label': 'Delete question',
+        onclick: () => { snapshot(); todos.splice(todos.indexOf(t), 1); save(); redraw(); renderBar(); } }, icon('x')))),
+    h('label', { class: 'todo-add', 'data-for': key }, icon('plus'), add));
+}
+function totalOpen() { let k = S.todos.filter((t) => !t.done).length; walk(everything(), (n) => { if (n.type === 'scene') k += openCount(n); }); return k; }
+
+function openQuestions() {
+  closePop();
+  let showDone = false;
+  const body = h('div', { class: 'qlist' });
+  const nums = new Map(); let k = 0;
+  walk(S.items, (n) => { if (n.type === 'scene') nums.set(n.id, ++k); });
+  const draw = () => {
+    const blocks = [];
+    const visible = (l) => l.filter((t) => showDone || !t.done);
+    blocks.push(h('section', { class: 'qgroup' }, h('h3', null, 'Whole book'),
+      todoList(S.todos, 'book', draw, !showDone)));
+    walk(everything(), (n) => {
+      if (n.type !== 'scene' || !visible(n.todos).length) return;
+      const num = nums.get(n.id);
+      blocks.push(h('section', { class: 'qgroup' },
+        h('h3', null, h('button', { class: 'qscene', title: 'Go to this scene', onclick: () => { scrim.remove(); n.open = Math.max(n.open || 0, 1); renderBar(); reveal(n.id); } },
+          h('span', { class: 'num' }, num || 'held'), n.title || 'Untitled scene', icon('right'))),
+        todoList(n.todos, 'q-' + n.id, draw, !showDone)));
+    });
+    if (blocks.length === 1 && !totalOpen()) blocks.push(h('p', { class: 'pf-empty' }, 'No open questions in your scenes. Add one from a scene’s ⋯ menu or under its description.'));
+    setKids(body, blocks);
+    const k = totalOpen(); const c = $('#q-count'); if (c) c.textContent = `${k} open`;
+  };
+  const scrim = h('div', { class: 'scrim', onclick: (e) => { if (e.target === scrim) { scrim.remove(); renderAll(); } } },
+    h('div', { class: 'modal notes', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'q-h' },
+      h('div', { class: 'notes-head' }, h('span', { class: 'qicon' }, icon('q')), h('h2', { id: 'q-h' }, 'Open questions'), h('span', { class: 'stat', id: 'q-count' }),
+        h('label', { class: 'opt' }, h('input', { type: 'checkbox', id: 'q-done', onchange: (e) => { showDone = e.target.checked; draw(); } }), 'Show answered')),
+      body,
+      h('div', { class: 'btns' }, h('span', { class: 'hint' }, 'Tick a question when it’s answered. Saves as you type.'), h('span', { class: 'spacer' }),
+        h('button', { class: 'btn primary', onclick: () => { scrim.remove(); renderAll(); } }, 'Done'))));
+  scrim.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.stopPropagation(); scrim.remove(); renderAll(); } });
+  document.body.append(scrim);
+  draw();
 }
 
 function plaques(n) {
@@ -1033,6 +1127,8 @@ function renderBar() {
     h('span', { class: 'spacer' }),
     h('span', { class: 'seg-label' }, 'View'),
     h('span', { class: 'seg', role: 'group', 'aria-label': 'Expand outline to' }, levels.map(([label, l, tip]) => h('button', { title: tip, onclick: () => setLevel(l) }, label))),
+    h('button', { class: 'tb', title: 'Every open question in the book', 'aria-label': 'Open questions', onclick: openQuestions },
+      icon('q'), h('span', { class: 'lbl' }, 'Questions'), totalOpen() ? h('span', { class: 'qcount' }, totalOpen()) : null),
     h('button', { class: 'tb' + (S.ui.heat ? ' on' : ''), title: 'Show or hide intensity colours and the flow chart', 'aria-pressed': String(!!S.ui.heat),
       onclick: () => { S.ui.heat = !S.ui.heat; save(); renderBar(); renderTree(); } }, h('span', { class: 'hsw', style: 'width:10px;height:10px;background:linear-gradient(90deg,var(--h1),var(--h2),var(--h3),var(--h4),var(--h5))' }), 'Heatmap'),
     h('span', { class: 'stat', id: 'stat' }),
@@ -1386,6 +1482,7 @@ function openMenu(anchor, n) {
     items.push(mi('Add scene inside', () => addInside(n, 'scene')), mi('Add time marker inside', () => addInside(n, 'time')), mi('Add sub-section inside', () => addInside(n, 'section')), h('div', { class: 'msep' }), mi('Add section below', () => addAfter(n, 'section')));
   } else {
     items.push(mi('Add scene below', () => addAfter(n, 'scene')), mi('Add time marker below', () => addAfter(n, 'time')));
+    if (n.type === 'scene') items.push(mi('Add open question', () => { n.open = Math.max(n.open || 0, 1); askingIn.add(n.id); save(); renderTree(); focusQuestion(n.id); }));
   }
   const inHolding = hit.parent === S.holding;
   items.push(h('div', { class: 'msep' }),
@@ -1637,6 +1734,10 @@ function outlineMarkdown(opt) {
     }
     out.push('');
   }
+  const bookQs = S.todos.filter((t) => !t.done && t.text.trim());
+  if (opt.questions && bookQs.length) {
+    out.push('## Open questions (whole book)', '', ...bookQs.map((t) => `- ${t.text.trim()}`), '');
+  }
   if (S.threads.length) {
     out.push('## Plot threads', '');
     for (const t of S.threads) out.push(`- **${t.name || '(unnamed)'}** (in ${scenes(usage.get(t.id) || 0)})${noteText(t.note)}`);
@@ -1677,6 +1778,8 @@ function outlineMarkdown(opt) {
         if (meta.length) out.push(`- ${meta.join(' · ')}`);
         if (n.summary.trim()) out.push(`- Summary: ${n.summary.trim().replace(/\s*\n\s*/g, ' ')}`);
         if (opt.details && n.details.trim()) out.push('- Details:', indent(n.details, '    '));
+        const qs = n.todos.filter((t) => !t.done && t.text.trim());
+        if (opt.questions && qs.length) out.push('- Open questions:', ...qs.map((t) => `    - ${t.text.trim()}`));
         out.push('');
       }
     }
@@ -1691,7 +1794,7 @@ function outlineMarkdown(opt) {
 }
 function openAiExport() {
   closePop();
-  const opt = { details: true, status: true, climate: true, holding: true, onlyFilter: !!filter };
+  const opt = { details: true, status: true, climate: true, holding: true, questions: true, onlyFilter: !!filter };
   const ta = h('textarea', { id: 'ai-md', spellcheck: 'false', 'aria-label': 'Outline as text' });
   const words = h('span', { class: 'stat' });
   const refresh = () => { ta.value = outlineMarkdown(opt); words.textContent = `${ta.value.split(/\s+/).length.toLocaleString()} words`; };
@@ -1701,7 +1804,7 @@ function openAiExport() {
     h('div', { class: 'modal', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'ai-h' },
       h('h2', { id: 'ai-h' }, 'Share with AI'),
       h('p', null, 'A plain-text version of your outline with names written out, so an AI can follow it easily. Copy it and paste it into a chat, then ask your question underneath. This is for reading only; use Backup to save or restore.'),
-      h('div', { class: 'btns' }, box('details', 'Scene details'), box('status', 'Status'), box('climate', 'Weather table'), box('holding', 'Holding scenes'), filter && filterTarget() ? box('onlyFilter', `Only scenes with ${filterTarget().name}`) : null),
+      h('div', { class: 'btns' }, box('details', 'Scene details'), box('status', 'Status'), box('questions', 'Open questions'), box('climate', 'Weather table'), box('holding', 'Holding scenes'), filter && filterTarget() ? box('onlyFilter', `Only scenes with ${filterTarget().name}`) : null),
       ta,
       h('div', { class: 'btns' },
         h('button', { class: 'btn primary', onclick: async () => {
