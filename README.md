@@ -21,4 +21,4 @@ Open `index.html` in any modern browser. There's nothing to install or build.
 
 ## Saving
 
-Everything saves automatically to your browser's local storage on this device. Use **Backup** to copy or download your outline as a file now and then, and to restore it on another device.
+Everything saves automatically to your browser's local storage on this device. Use **Backup** to copy or download your outline as a file now and then, and to restore it on another device. **Add new characters & places** in the same window brings in only the characters and places from a file that aren't in your list yet, leaving your scenes and existing notes alone.

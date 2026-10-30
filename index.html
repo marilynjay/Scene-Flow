@@ -413,12 +413,16 @@ function setKids(el, ...kids) {
   el.replaceChildren();
   for (const c of kids.flat()) if (c != null && c !== false) el.append(c.nodeType ? c : document.createTextNode(c));
 }
+// Titles and quoted or bracketed nicknames are skipped for initials: "Dr. Felix Harrow" → FH.
+const HONORIFIC = /^(dr|prof|professor|dean|major|captain|capt|mr|mrs|ms|miss|sir|lady|lord)\.?$/i;
+const nameParts = (name) => (name || '').replace(/[“"(][^”")]*[”")]/g, ' ').trim().split(/\s+/).filter((w) => w && !HONORIFIC.test(w));
 function initials(name) {
-  const p = (name || '?').trim().split(/\s+/).filter(Boolean);
+  const p = nameParts(name);
   if (!p.length) return '?';
   return (p.length === 1 ? p[0].slice(0, 2) : p[0][0] + p[p.length - 1][0]).toUpperCase();
 }
-const firstName = (name) => (name || '').trim().split(/\s+/)[0] || '?';
+// A quoted nickname wins for short labels: Mildred “Milly” Ellsworth → Milly.
+const firstName = (name) => { const nick = (name || '').match(/[“"]([^”"]+)[”"]/); return nick ? nick[1] : nameParts(name)[0] || (name || '').trim().split(/\s+/)[0] || '?'; };
 const words = (t) => (t || '').trim() ? t.trim().split(/\s+/).length : 0;
 function grow(t) { if (CSS.supports('field-sizing', 'content')) return; t.style.height = 'auto'; t.style.height = t.scrollHeight + 'px'; }
 
@@ -1148,10 +1152,31 @@ function openBackup() {
     if (!armed) { armed = true; replaceBtn.textContent = 'Click again to replace everything'; return; }
     snapshot(); S = next; save(); filter = null; scrim.remove(); renderAll(); toast('Outline restored', 'Undo', undo);
   } }, 'Replace outline with this');
+  const mergeBtn = h('button', { class: 'btn', title: 'Adds characters and places whose names aren’t in your list yet. Scenes and everything else stay as they are.', onclick: () => {
+    let next;
+    try { next = normalize(JSON.parse(ta.value)); } catch (err) { toast('That text isn’t a valid backup. Paste the full text you copied, starting with {'); return; }
+    snapshot();
+    const add = (from, into) => {
+      const have = new Set(into.map((x) => x.name.trim().toLowerCase()));
+      const ids = new Set(into.map((x) => x.id));
+      let n = 0;
+      for (const x of from) {
+        if (have.has(x.name.trim().toLowerCase())) continue;
+        into.push({ id: ids.has(x.id) ? uid() : x.id, name: x.name, color: x.color, note: x.note });
+        n++;
+      }
+      return n;
+    };
+    const c = add(next.characters, S.characters), pl = add(next.places, S.places);
+    const skipped = next.characters.length + next.places.length - c - pl;
+    save(); scrim.remove(); renderAll();
+    const parts = [c && `${c} character${c === 1 ? '' : 's'}`, pl && `${pl} place${pl === 1 ? '' : 's'}`].filter(Boolean).join(' and ');
+    toast(`${parts ? `Added ${parts}` : 'Nothing new to add'}${skipped ? ` · ${skipped} already in your list` : ''}`, parts ? 'Undo' : null, undo);
+  } }, 'Add new characters & places');
   const scrim = h('div', { class: 'scrim', onclick: (e) => { if (e.target === scrim) scrim.remove(); } },
     h('div', { class: 'modal', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'bk-h' },
       h('h2', { id: 'bk-h' }, 'Back up your outline'),
-      h('p', null, 'Your outline saves automatically in this browser only. Copy this text or download it somewhere safe now and then. To restore, paste a backup here or open a saved file, then replace.'),
+      h('p', null, 'Your outline saves automatically in this browser only. Copy this text or download it somewhere safe now and then. To restore, paste a backup here or open a saved file, then replace. To bring in only new characters and places without touching your scenes, use Add new characters & places.'),
       ta,
       h('div', { class: 'btns' },
         h('button', { class: 'btn primary', onclick: async () => {
@@ -1163,7 +1188,7 @@ function openBackup() {
         } }, 'Download file'),
         h('button', { class: 'btn', onclick: () => file.click() }, 'Open file…'),
         h('span', { class: 'spacer' }),
-        replaceBtn, file),
+        mergeBtn, replaceBtn, file),
       h('div', { class: 'btns' }, h('span', { class: 'spacer' }), h('button', { class: 'btn', onclick: () => scrim.remove() }, 'Close'))));
   document.body.append(scrim);
 }
