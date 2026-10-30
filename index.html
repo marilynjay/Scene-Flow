@@ -171,6 +171,19 @@ main {
 .pf-arrow { align-self: center; color: var(--faint); font-size: 16px; }
 .pf-empty { color: var(--muted); font-size: 13px; }
 .pf-empty button { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
+.eye { width: 34px; height: 20px; flex: none; color: var(--muted); display: block; }
+.eye.big { width: 46px; height: 27px; }
+.eye-row { display: flex; align-items: center; gap: 6px; }
+.eye-row > input { flex: 1; min-width: 0; }
+.eye-pick { position: relative; display: grid; place-items: center; width: 44px; height: 32px; border: 1px solid var(--line); border-radius: 4px; background: var(--bg); cursor: pointer; flex: none; }
+.eye-pick:hover { border-color: var(--accent); }
+.eye-pick input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+.eye-clear { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; color: var(--faint); flex: none; }
+.eye-clear:hover { background: var(--line); color: var(--fg); }
+.pf-looks { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 14px; margin: 2px 0 4px; align-items: center; }
+.pf-looks dt { font: 600 10.5px/1.2 var(--ui); text-transform: uppercase; letter-spacing: .08em; color: var(--faint); }
+.pf-looks dd { margin: 0; font: 400 13px/1.45 var(--book); color: var(--fg); }
+.pf-eyes { display: flex; align-items: center; gap: 10px; }
 .pf-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 12px; }
 .pf-field { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .pf-field input, .pf-ta { width: 100%; border: 1px solid var(--line); border-radius: 4px; background: var(--bg); padding: 5px 7px; outline: 0; font: 400 13px/1.45 var(--ui); color: var(--fg); }
@@ -616,7 +629,10 @@ const CHAR_FIELDS = [
   { k: 'age', label: 'Age', short: true, hint: 'e.g. 19, late 50s' },
   { k: 'group', label: 'Group or role', short: true, hint: 'e.g. Freshman · CHAR Unit, Faculty' },
   { k: 'track', label: 'Track', short: true, hint: 'e.g. Combat, Ancillary' },
-  { k: 'appearance', label: 'Appearance', hint: 'Hair, eyes, build, height, clothes, how they carry themselves' },
+  { k: 'height', label: 'Height', short: true, hint: 'e.g. 5′3″, tall for her age' },
+  { k: 'hair', label: 'Hair', short: true, hint: 'e.g. chestnut, high messy bun' },
+  { k: 'eyes', label: 'Eyes', short: true, hint: 'e.g. green, flash red when angry' },
+  { k: 'appearance', label: 'Other appearance details', hint: 'Build, skin, clothes, style, scars, how they carry themselves' },
   { k: 'power', label: 'Power', hint: 'What they can do, its limits and costs' },
   { k: 'growth', label: 'Power growth', hint: 'How their power changes over the story' },
   { k: 'growthStart', label: 'At the start', hint: 'What they can do when the story begins' },
@@ -697,6 +713,7 @@ function normalize(s) {
   for (const c of s.characters) {
     if (!c.profile) { splitProfileNote(c); c.profile = 1; }
     for (const f of CHAR_FIELDS) c[f.k] = typeof c[f.k] === 'string' ? c[f.k] : '';
+    c.eyeColor = /^#[0-9a-f]{6}$/i.test(c.eyeColor || '') ? c.eyeColor : '';
   }
   // Outlines saved before the example was marked: recognise the untouched example book by its title.
   if (s.sample == null && s.title === 'Untitled novel (example)' && s.characters.some((c) => c.name === 'Ellie Hart')) s.sample = true;
@@ -1099,11 +1116,21 @@ function libGroup(key, label, lib, type, usage, ph) {
   g.append(h('label', { class: 'lib-add' }, icon('plus'), inp));
   return g;
 }
+// A small almond eye whose iris takes the character's eye colour; an unset colour draws an empty iris.
+function eyeIcon(color, cls = '') {
+  const t = document.createElement('template');
+  t.innerHTML = `<svg class="eye ${cls}" viewBox="0 0 34 20" aria-hidden="true">
+    <path d="M1.5 10C7 1.8 27 1.8 32.5 10 27 18.2 7 18.2 1.5 10Z" fill="#fbfaf7" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>
+    <circle cx="17" cy="10" r="6.2" fill="${color || 'none'}" stroke="${color ? 'rgba(0,0,0,.35)' : 'currentColor'}" stroke-width="1"${color ? '' : ' stroke-dasharray="2 2"'}/>
+    ${color ? '<circle cx="17" cy="10" r="2.6" fill="#15131a"/><circle cx="19.3" cy="7.7" r="1.3" fill="#fff" opacity=".9"/>' : ''}
+  </svg>`;
+  return t.content.firstChild;
+}
 function openDetails(x, type, count) {
   closePop();
   const what = type === 'place' ? 'place' : type === 'thread' ? 'plot thread' : 'character';
   const fields = fieldsFor(type);
-  const filled = () => fields.some((f) => (x[f.k] || '').trim());
+  const filled = () => fields.some((f) => (x[f.k] || '').trim()) || !!x.eyeColor;
   let editing = !filled();
   const close = () => { scrim.remove(); renderRail(); renderTree(); };
   const badge = h('span', { class: type === 'place' ? 'swatch sq' : type === 'thread' ? 'swatch thr' : 'av', style: `--c:${x.color}` }, type === 'char' ? initials(x.name) : null);
@@ -1133,6 +1160,18 @@ function openDetails(x, type, count) {
       setKids(body,
         shorts.length ? h('div', { class: 'pf-grid' }, shorts.map((f) => {
           const id = `pf-${x.id}-${f.k}`;
+          if (f.k === 'eyes') {
+            const slot = h('span', { class: 'eye-slot' }, eyeIcon(x.eyeColor));
+            const clear = h('button', { class: 'eye-clear', hidden: !x.eyeColor, title: 'Remove eye colour', 'aria-label': 'Remove eye colour',
+              onclick: (e) => { e.preventDefault(); x.eyeColor = ''; slot.replaceChildren(eyeIcon('')); clear.hidden = true; save(); } }, icon('x'));
+            return h('div', { class: 'pf-field' }, h('label', { class: 'pf-label', for: id }, f.label),
+              h('div', { class: 'eye-row' },
+                h('label', { class: 'eye-pick', title: 'Pick eye colour' }, slot,
+                  h('input', { type: 'color', value: x.eyeColor || '#6b8e5a', 'aria-label': 'Eye colour',
+                    oninput: (e) => { x.eyeColor = e.target.value; slot.replaceChildren(eyeIcon(x.eyeColor)); clear.hidden = false; save(); } })),
+                clear,
+                h('input', { id, value: x.eyes || '', placeholder: f.hint, oninput: (e) => { x.eyes = e.target.value; save(); } })));
+          }
           const inp = h('input', { id, value: x[f.k] || '', placeholder: f.hint, list: lists[f.k] ? id + '-list' : null,
             oninput: (e) => { x[f.k] = e.target.value; save(); } });
           return h('label', { class: 'pf-field' }, h('span', { class: 'pf-label' }, f.label), inp,
@@ -1155,7 +1194,13 @@ function openDetails(x, type, count) {
           val('alias') ? h('div', { class: 'pf-alias' }, val('alias')) : null,
           chips.length ? h('div', { class: 'pf-chips' }, chips.map((t) => h('span', { class: 'pf-chip' }, t))) : null) : null,
         type !== 'char' ? para('note') : [
-          para('appearance'), para('power'),
+          val('height') || val('hair') || val('eyes') || x.eyeColor || val('appearance') ? h('section', { class: 'pf-sec' }, h('h3', null, 'Appearance'),
+            val('height') || val('hair') || val('eyes') || x.eyeColor ? h('dl', { class: 'pf-looks' },
+              val('height') ? [h('dt', null, 'Height'), h('dd', null, val('height'))] : null,
+              val('hair') ? [h('dt', null, 'Hair'), h('dd', null, val('hair'))] : null,
+              val('eyes') || x.eyeColor ? [h('dt', null, 'Eyes'), h('dd', { class: 'pf-eyes' }, x.eyeColor ? eyeIcon(x.eyeColor, 'big') : null, val('eyes') || null)] : null) : null,
+            val('appearance') ? h('div', { class: 'pf-text' }, val('appearance')) : null) : null,
+          para('power'),
           growth ? h('section', { class: 'pf-sec' }, h('h3', null, 'Power growth'),
             val('growth') ? h('div', { class: 'pf-text' }, val('growth')) : null,
             val('growthStart') || val('growthEnd') ? h('div', { class: 'pf-arc' },
