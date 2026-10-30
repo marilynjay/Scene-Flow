@@ -430,6 +430,8 @@ html { touch-action: manipulation; }
     padding-top: calc(8px + env(safe-area-inset-top, 0px)); padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
   .rail-close { display: flex; }
   .bar { position: static; }
+  /* Home-screen app: iOS fades and blurs the strip just under the status bar, so start the top bar below it. */
+  @media (display-mode: standalone) { .bar { padding-top: 26px; } }
   .seg-label, .stat { display: none; }
 }
 @media (max-width: 600px) {
