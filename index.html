@@ -132,6 +132,14 @@ main {
 .ib:hover { color: var(--fg); background: var(--line); }
 .lib-row .ib.hov { visibility: hidden; }
 .lib-row:hover .ib.hov, .lib-row.on .ib.hov, .lib-row:focus-within .ib.hov { visibility: visible; }
+.modal.notes { width: min(760px, 100%); height: min(780px, calc(100dvh - 32px)); }
+.notes-head { display: flex; align-items: center; gap: 8px; }
+.notes-head .av { width: 22px; height: 22px; font-size: 10px; }
+.notes-head .swatch { width: 16px; height: 16px; }
+.notes-head h2 { flex: 1; min-width: 0; }
+.notes-head .stat { display: inline; }
+.modal textarea.notes-ta { flex: 1; height: auto; min-height: 200px; resize: none; font: 400 12.5px/1.55 var(--ui); white-space: pre-wrap; padding: 8px 10px; }
+.modal .hint { padding: 0; }
 .lib-note { width: 100%; margin: 0 0 4px 21px; width: calc(100% - 25px); border: 1px solid var(--line); border-radius: 4px; background: var(--panel); padding: 4px 6px; resize: none; font: 400 var(--fs-s)/1.4 var(--ui); color: var(--fg); min-height: 22px; overflow: hidden; }
 .lib-add { display: flex; align-items: center; gap: 5px; height: 22px; padding: 0 4px; color: var(--faint); }
 .lib-add input { border: 0; background: none; outline: 0; width: 100%; min-width: 0; color: var(--fg); }
@@ -842,20 +850,15 @@ function libGroup(key, label, lib, type, usage, ph) {
     const sw = h('label', { class: 'swatch' + (type === 'place' ? ' sq' : ''), style: `--c:${x.color}`, title: 'Change colour' },
       h('input', { type: 'color', value: x.color, 'aria-label': `Colour for ${x.name}`,
         oninput: (e) => { x.color = e.target.value; sw.style.setProperty('--c', x.color); save(); renderTreeSoon(); } }));
-    g.append(h('div', { class: 'lib-row' + (on ? ' on' : '') },
+    g.append(h('div', { class: 'lib-row' + (on ? ' on' : ''), title: x.note ? x.note.trim().split('\n')[0] : null },
       sw,
       editable('lname', x.name, 'Name', (v) => { x.name = v; }, renderTreeSoon),
       h('span', { class: 'lcount', title: `In ${usage.get(x.id) || 0} scenes` }, usage.get(x.id) || ''),
-      h('button', { class: 'ib hov', title: x.note ? 'Hide notes' : 'Notes', 'aria-label': 'Notes', style: x.note ? 'visibility:visible' : null,
-        onclick: () => { x.showNote = !x.showNote; save(); renderRail(); if (x.showNote) setTimeout(() => $(`[data-note="${x.id}"]`)?.focus()); } }, icon('note')),
+      h('button', { class: 'ib hov', title: x.note ? 'Open notes' : 'Add notes', 'aria-label': 'Notes', style: x.note ? 'visibility:visible' : null,
+        onclick: () => openNotes(x, type, usage.get(x.id) || 0) }, icon('note')),
       h('button', { class: 'ib hov', title: on ? 'Clear filter' : 'Highlight scenes with ' + (x.name || 'this'), 'aria-label': 'Filter',
         onclick: () => { filter = on ? null : { type, id: x.id }; renderAll(); } }, icon('filter')),
       h('button', { class: 'ib hov', title: 'Delete', 'aria-label': 'Delete', onclick: () => removeLib(type, x) }, icon('trash'))));
-    if (x.showNote) {
-      const t = area('lib-note', x.note, type === 'place' ? 'What it looks, sounds, smells like…' : 'Age, look, wants, voice…', (v) => { x.note = v; });
-      t.dataset.note = x.id;
-      g.append(t);
-    }
   }
   const inp = h('input', { placeholder: ph, 'aria-label': ph,
     onkeydown: (e) => {
@@ -865,6 +868,24 @@ function libGroup(key, label, lib, type, usage, ph) {
     } });
   g.append(h('label', { class: 'lib-add' }, icon('plus'), inp));
   return g;
+}
+function openNotes(x, type, count) {
+  closePop();
+  const close = () => { scrim.remove(); renderRail(); };
+  const ta = h('textarea', { id: 'notes-' + x.id, class: 'notes-ta', spellcheck: 'true', 'aria-label': `Notes for ${x.name}`,
+    placeholder: type === 'place' ? 'What it looks, sounds and smells like, who goes there, what happened here…' : 'Age, appearance, power, wants, voice, backstory…' });
+  ta.value = x.note || '';
+  ta.addEventListener('input', () => { x.note = ta.value; save(); });
+  const scrim = h('div', { class: 'scrim', onclick: (e) => { if (e.target === scrim) close(); } },
+    h('div', { class: 'modal notes', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'notes-h' },
+      h('div', { class: 'notes-head' },
+        h('span', { class: (type === 'place' ? 'swatch sq' : 'av'), style: `--c:${x.color}` }, type === 'place' ? null : initials(x.name)),
+        h('h2', { id: 'notes-h' }, x.name || '(unnamed)'),
+        h('span', { class: 'stat' }, `${count} scene${count === 1 ? '' : 's'}`)),
+      ta,
+      h('div', { class: 'btns' }, h('span', { class: 'hint' }, 'Saves as you type.'), h('span', { class: 'spacer' }), h('button', { class: 'btn', onclick: close }, 'Close'))));
+  document.body.append(scrim);
+  ta.focus(); ta.setSelectionRange(0, 0); ta.scrollTop = 0;
 }
 function climateGroup() {
   const g = h('div', { class: 'grp' + (S.ui.lib.climate ? ' open' : '') }, groupHead('climate', 'Climate by month'));
@@ -930,10 +951,15 @@ function openPicker(anchor, kind, scene) {
     input.value = '';
     choose(x);
   };
-  let visible = [];
+  let visible = [], hi = 0;
+  const opts = () => [...list.querySelectorAll('.pk-item')];
+  const mark = () => opts().forEach((b, i) => b.classList.toggle('kb', i === hi));
+  // Names that start with what was typed come first, then a later word that starts with it, then anything containing it.
+  const rank = (x, q) => { const n = x.name.toLowerCase(); return n.startsWith(q) ? 0 : n.split(/[\s(]+/).some((w) => w.startsWith(q)) ? 1 : 2; };
   const draw = () => {
     const q = input.value.trim().toLowerCase();
     visible = lib.filter((x) => x.name.toLowerCase().includes(q));
+    if (q) visible.sort((a, b) => rank(a, q) - rank(b, q));
     setKids(list, 
       h('div', { class: 'pk-head' }, kind === 'pov' ? 'Point of view' : kind === 'place' ? 'Place' : 'Characters present'),
       kind !== 'chars' && !q ? h('button', { class: 'pk-item', onclick: () => choose(null) }, h('span', { class: 'chk' }, !scene[kind] ? icon('check') : null), h('span', { class: 'nm', style: 'color:var(--muted)' }, 'None')) : null,
@@ -942,11 +968,23 @@ function openPicker(anchor, kind, scene) {
         kind === 'place' ? h('span', { class: 'swatch sq', style: `--c:${x.color}` }) : h('span', { class: 'av', style: `--c:${x.color}` }, initials(x.name)),
         h('span', { class: 'nm' }, x.name || '(unnamed)'))),
       q && !lib.some((x) => x.name.toLowerCase() === q) ? h('button', { class: 'pk-item add', onclick: create }, h('span', { class: 'chk' }, icon('plus')), h('span', { class: 'nm' }, `Add “${input.value.trim()}”`)) : null);
+    hi = Math.max(0, Math.min(hi, opts().length - 1));
+    mark();
   };
-  input.addEventListener('input', draw);
+  input.addEventListener('input', () => { hi = 0; draw(); });
   input.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') closePop();
-    if (e.key === 'Enter') { e.preventDefault(); if (visible.length === 1 && input.value.trim()) { choose(visible[0]); input.value = ''; draw(); } else create(); }
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      hi = Math.max(0, Math.min(opts().length - 1, hi + (e.key === 'ArrowDown' ? 1 : -1)));
+      mark(); opts()[hi]?.scrollIntoView({ block: 'nearest' });
+    }
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const b = opts()[hi]; if (!b) return;
+      b.click();
+      if (kind === 'chars' && pop) { input.value = ''; hi = 0; draw(); }
+    }
   });
   pop = h('div', { class: 'pop picker' }, input, list);
   draw();
@@ -1140,6 +1178,12 @@ function outlineMarkdown(opt) {
     if (n.pov) povs.set(n.pov, (povs.get(n.pov) || 0) + 1);
   });
   const scenes = (k) => `${k} scene${k === 1 ? '' : 's'}`;
+  // Short notes stay on the bullet line; longer ones keep their line breaks, indented under it.
+  const noteText = (note) => {
+    const t = (note || '').trim();
+    if (!t) return '';
+    return t.includes('\n') ? '\n' + indent(t, '    ') : ': ' + t;
+  };
   const indent = (t, pad) => t.trim().split('\n').map((l) => pad + l).join('\n');
   const out = [];
   out.push(`# ${S.title || 'Untitled novel'}`, '');
@@ -1148,13 +1192,13 @@ function outlineMarkdown(opt) {
     out.push('## Characters', '');
     for (const c of S.characters) {
       const stats = [`in ${scenes(usage.get(c.id) || 0)}`, povs.get(c.id) ? `POV in ${povs.get(c.id)}` : null].filter(Boolean).join(', ');
-      out.push(`- **${c.name || '(unnamed)'}** (${stats})${c.note ? ': ' + c.note.trim().replace(/\s*\n\s*/g, ' ') : ''}`);
+      out.push(`- **${c.name || '(unnamed)'}** (${stats})${noteText(c.note)}`);
     }
     out.push('');
   }
   if (S.places.length) {
     out.push('## Places', '');
-    for (const p of S.places) out.push(`- **${p.name || '(unnamed)'}** (in ${scenes(usage.get(p.id) || 0)})${p.note ? ': ' + p.note.trim().replace(/\s*\n\s*/g, ' ') : ''}`);
+    for (const p of S.places) out.push(`- **${p.name || '(unnamed)'}** (in ${scenes(usage.get(p.id) || 0)})${noteText(p.note)}`);
     out.push('');
   }
   if (opt.climate && S.climate.some(Boolean)) {
