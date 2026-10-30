@@ -370,7 +370,7 @@ textarea::placeholder { color: var(--faint); }
 .plq .t { overflow: hidden; text-overflow: ellipsis; min-width: 0; color: var(--fg); }
 .plq.empty { background: none; border-style: dashed; color: var(--faint); opacity: 0; }
 .row:hover .plq.empty, .row:focus-within .plq.empty, .plq.empty:focus-visible { opacity: 1; }
-@media (hover: none) { .acts { display: none; } .plq.empty, .grip, .dots { opacity: .6; } .lib-row .ib.hov { visibility: visible; } }
+@media (hover: none) { .acts { opacity: 1; } .acts button:not(.act-scene) { display: none; } .plq.empty, .grip, .dots { opacity: .6; } .lib-row .ib.hov { visibility: visible; } }
 html { touch-action: manipulation; }
 @media (hover: none) { .details-name, textarea.notes-ta, .search input, .lib-add input { font-size: 16px; } }
 .av { display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; background: var(--c); color: #fff; font: 600 8.5px/1 var(--ui); letter-spacing: .02em; flex: none; text-shadow: 0 0 2px rgba(0,0,0,.25); }
@@ -998,7 +998,7 @@ function renderSection(n, depth, nums) {
     h('span', { class: 'count' }, count ? `${count}` : ''),
     h('span', { class: 'acts' },
       n.summary || describing.has(n.id) ? null : h('button', { onclick: (e) => { e.stopPropagation(); describeSection(n); }, title: 'Describe what happens in this section' }, '+ Description'),
-      h('button', { onclick: add('scene'), title: 'Add a scene at the end of this section' }, '+ Scene'),
+      h('button', { class: 'act-scene', onclick: add('scene'), title: 'Add a scene at the end of this section' }, '+ Scene'),
       h('button', { onclick: add('time'), title: 'Add a time marker at the end of this section' }, '+ Time'),
       h('button', { onclick: add('section'), title: 'Add a sub-section' }, '+ Section')),
     dotsBtn(n));
