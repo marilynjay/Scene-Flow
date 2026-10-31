@@ -433,7 +433,7 @@ html { touch-action: manipulation; }
 .banner b { font-weight: 600; }
 .banner .btns { display: flex; gap: 6px; flex-wrap: wrap; }
 .flow { display: none; max-width: 980px; margin-bottom: 10px; padding: 6px 8px 4px; background: var(--panel); border: 1px solid var(--line); border-radius: 4px; }
-.heaton .flow { display: block; }
+.charton .flow { display: block; }
 .flow-h { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; font-size: var(--fs-s); color: var(--muted); margin-bottom: 4px; }
 .flow-h b { font-weight: 600; text-transform: uppercase; letter-spacing: .07em; font-size: 10px; }
 .flow-key { display: inline-flex; gap: 8px; flex-wrap: wrap; }
@@ -586,6 +586,7 @@ const ICONS = {
   thread: '<path d="M1.8 11.5c2.2 0 2.6-7 5.2-7s2.4 7 5 7"/><circle cx="13.6" cy="11.5" r="1.4"/>',
   q: '<circle cx="8" cy="8" r="6.3"/><path d="M6.1 6.2a2 2 0 0 1 3.9.6c0 1.4-2 1.6-2 3"/><circle cx="8" cy="11.9" r=".5" fill="currentColor"/>',
   pen: '<path d="M10.6 2.8l2.6 2.6-7.4 7.4-3.3.7.7-3.3z"/><path d="M9.2 4.2l2.6 2.6"/>',
+  chart: '<path d="M3 13.2V9.5M6.4 13.2V6.2M9.8 13.2V8M13.2 13.2V3.8"/>',
   plus: '<path d="M8 3.2v9.6M3.2 8h9.6"/>',
   search: '<circle cx="7" cy="7" r="4.3"/><path d="M10.3 10.3L14 14"/>',
   filter: '<path d="M2.2 3h11.6L9.4 8.4v4.4l-2.8-1.4v-3z"/>',
@@ -972,7 +973,8 @@ function renderTree() {
 function renderFlow() {
   const flow = $('#flow');
   $('#layout').classList.toggle('heaton', !!S.ui.heat);
-  if (!S.ui.heat) return flow.replaceChildren();
+  $('#layout').classList.toggle('charton', !!S.ui.heat && S.ui.heatChart !== false);
+  if (!S.ui.heat || S.ui.heatChart === false) return flow.replaceChildren();
   const bars = h('div', { class: 'bars' });
   let num = 0, set = 0, total = 0, sum = 0, lastSec = null;
   walk(S.items, (n, parent) => {
@@ -1495,13 +1497,25 @@ function renderBar() {
       h('span', { class: 'lg' }, label), h('span', { class: 'sm' }, short)))),
     h('button', { class: 'tb', title: 'Every to-do and open question in the book', 'aria-label': 'To-dos and questions', onclick: openQuestions },
       icon('pen'), h('span', { class: 'lbl' }, 'To-dos'), totalOpen() ? h('span', { class: 'qcount' }, totalOpen()) : null),
-    h('button', { class: 'tb' + (S.ui.heat ? ' on' : ''), title: 'Show or hide intensity colours and the flow chart', 'aria-pressed': String(!!S.ui.heat),
-      onclick: () => { S.ui.heat = !S.ui.heat; save(); renderBar(); renderTree(); } }, h('span', { class: 'hsw', style: 'width:10px;height:10px;background:linear-gradient(90deg,var(--h1),var(--h2),var(--h3),var(--h4),var(--h5))' }), 'Heatmap'),
+    // Heatmap cycles: colours + chart → colours only → off.
+    h('button', { class: 'tb' + (S.ui.heat ? ' on' : ''), 'aria-label': 'Heatmap: ' + heatModeLabel(),
+      title: `Heatmap: ${heatModeLabel()} (tap for ${HEAT_MODES[(heatMode() + 1) % 3]})`, onclick: cycleHeat },
+      h('span', { class: 'hsw', style: 'width:10px;height:10px;background:linear-gradient(90deg,var(--h1),var(--h2),var(--h3),var(--h4),var(--h5))' + (S.ui.heat ? '' : ';opacity:.45') }),
+      'Heatmap', S.ui.heat && S.ui.heatChart !== false ? icon('chart') : null),
     h('span', { class: 'stat', id: 'stat' }),
     h('button', { class: 'tb', title: 'Undo (Ctrl/⌘+Z)', onclick: undo }, icon('undo')),
     h('button', { class: 'tb', title: 'Copy a readable outline to paste into an AI chat', onclick: openAiExport }, icon('ai'), 'Share with AI'),
     h('button', { class: 'tb', title: 'Back up or restore your outline', onclick: openBackup, 'aria-label': 'Backup' }, icon('save'), h('span', { class: 'lbl' }, 'Backup')));
   renderStat();
+}
+const HEAT_MODES = ['colors and chart', 'colors only', 'off'];
+const heatMode = () => (!S.ui.heat ? 2 : S.ui.heatChart === false ? 1 : 0);
+const heatModeLabel = () => HEAT_MODES[heatMode()];
+function cycleHeat() {
+  const next = (heatMode() + 1) % 3;
+  S.ui.heat = next !== 2; S.ui.heatChart = next === 0;
+  save(); renderBar(); renderTree();
+  toast(`Heatmap: ${HEAT_MODES[next]}`);
 }
 function renderStat() {
   const el = $('#stat'); if (!el) return;
@@ -2376,7 +2390,7 @@ if (/iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'Mac
 }
 
 // When a newer version of the app is published, offer to reload instead of running a stale saved copy.
-const APP_VERSION = '2026-10-31.12';
+const APP_VERSION = '2026-10-31.13';
 async function checkForUpdate() {
   if (!/github\.io$/.test(location.hostname)) return;
   try {
