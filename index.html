@@ -569,6 +569,7 @@ html { touch-action: manipulation; }
 .mi-row button:hover { background: var(--hover); }
 .mi-row button[disabled] { color: var(--faint); cursor: default; background: none; }
 .mi.mi-nest { gap: 8px; }
+.mi.danger.armed { background: var(--danger); color: var(--panel); font-weight: 600; }
 .mi.mi-nest .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .mi-label { font: 600 9.5px/1 var(--ui); text-transform: uppercase; letter-spacing: .08em; color: var(--faint); padding: 5px 6px 2px; }
 .pop.menu .mi-status { padding: 2px; flex-wrap: nowrap; }
@@ -2019,6 +2020,12 @@ function openMenu(anchor, n) {
     h('button', { class: 'mi', onclick: () => openSceneTasks(anchor, n) }, 'Tag with a change…', h('span', { class: 'k' }, '▸')),
     mi('Turn into section', () => sceneToSection(n)));
   const inHolding = hit.parent === S.holding;
+  // Anything with writing in it asks for a second tap; blank items delete straight away.
+  let armed = false;
+  const delBtn = h('button', { class: 'mi danger', onclick: () => {
+    if (hasContent(n) && !armed) { armed = true; delBtn.classList.add('armed'); setKids(delBtn, icon('trash'), 'Tap again to delete'); return; }
+    closePop(); removeNode(n);
+  } }, icon('trash'), 'Delete');
   items.push(h('div', { class: 'msep' }),
     h('div', { class: 'mi-label' }, 'Move'),
     h('div', { class: 'mi-row' },
@@ -2031,9 +2038,15 @@ function openMenu(anchor, n) {
     inHolding ? null : mi('Move to holding', () => moveTo(n, 'holding')),
     mi('Duplicate', () => { snapshot(); hit.list.splice(idx + 1, 0, cloneNode(n)); save(); renderAll(); }),
     h('div', { class: 'msep' }),
-    mi('Delete', () => removeNode(n), { danger: true, icon: 'trash' }));
+    delBtn);
   pop = h('div', { class: 'pop menu' }, items);
   place(pop, anchor);
+}
+function hasContent(n) {
+  const t = (x) => !!(x || '').trim();
+  if (n.type === 'scene') return t(n.title) || t(n.summary) || t(n.details) || n.todos.length > 0;
+  if (n.type === 'section') return t(n.title) || t(n.summary) || t(n.details) || n.children.length > 0;
+  return t(n.label) || t(n.weather);
 }
 function outdent(n) {
   const hit = find(n.id); if (!hit || !hit.parent || hit.parent === S.holding) return;
@@ -2636,7 +2649,7 @@ if (/iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'Mac
 }
 
 // When a newer version of the app is published, offer to reload instead of running a stale saved copy.
-const APP_VERSION = '2026-10-31.20';
+const APP_VERSION = '2026-10-31.21';
 async function checkForUpdate() {
   if (!/github\.io$/.test(location.hostname)) return;
   try {
