@@ -1897,6 +1897,7 @@ function openMenu(anchor, n) {
         STATUS.map((label, i) => h('button', { class: (n.status || 0) === i ? 'on' : '', 'aria-pressed': String((n.status || 0) === i),
           onclick: () => { n.status = i; save(); renderTree(); closePop(); } }, h('span', { class: 'st', 'data-s': i }), label))),
       h('div', { class: 'msep' }),
+      mi('Turn into section', () => sceneToSection(n)),
       mi('Add to-do or question', () => { n.open = Math.max(n.open || 0, 1); askingIn.add(n.id); save(); renderTree(); focusQuestion(n.id); }),
       h('button', { class: 'mi', onclick: () => openSceneTasks(anchor, n) }, 'Tag with a change across scenes…', h('span', { class: 'k' }, '▸')));
   }
@@ -1954,6 +1955,26 @@ function moveTo(n, destId) {
   save(); renderAll();
   reveal(n.id);
   toast(destId === 'holding' ? `Moved “${n.title || 'scene'}” to holding` : `Moved to ${dest ? `“${dest.node.title || 'Untitled section'}”` : 'the top level'}`, 'Undo', undo);
+}
+// A scene that turns out to be several: it becomes a section with the same name and description,
+// and the original scene (with its place, cast, tags and to-dos) becomes the first scene inside.
+function sceneToSection(n) {
+  const hit = find(n.id); if (!hit) return;
+  snapshot();
+  const sec = blankSection(n.title);
+  sec.summary = n.summary || ''; sec.showDesc = !!sec.summary; sec.step = 'Titles';
+  n.open = 0;
+  sec.children = [n];
+  hit.list.splice(hit.list.indexOf(n), 1, sec);
+  save(); renderAll();
+  toast('Turned into a section. Rename this first scene, then add more with + Scene');
+  // Select the first scene's title so it can be renamed straight away.
+  const f = () => {
+    const el = $(`[data-id="${n.id}"] .title`); if (!el) return;
+    el.focus(); const r = document.createRange(); r.selectNodeContents(el); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r);
+    el.scrollIntoView({ block: 'nearest' });
+  };
+  f(); setTimeout(f);
 }
 function newOf(type) { if (type === 'time') { const t = blankTime(); openTimes.add(t.id); return t; } return type === 'scene' ? blankScene() : blankSection(); }
 function focusNew(id) {
@@ -2355,7 +2376,7 @@ if (/iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'Mac
 }
 
 // When a newer version of the app is published, offer to reload instead of running a stale saved copy.
-const APP_VERSION = '2026-10-31.11';
+const APP_VERSION = '2026-10-31.12';
 async function checkForUpdate() {
   if (!/github\.io$/.test(location.hostname)) return;
   try {
