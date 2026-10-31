@@ -309,6 +309,7 @@ textarea::placeholder { color: var(--faint); }
 .qbadge:hover { border-color: var(--time); }
 .qcount { display: inline-grid; place-items: center; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--time); color: var(--panel); font: 600 10px/1 var(--mono); }
 .body-acts { display: flex; gap: 6px; flex-wrap: wrap; }
+.body-acts .add-after { margin-left: auto; color: var(--accent); }
 .todos { display: flex; flex-direction: column; gap: 1px; margin: 2px 0 2px 2px; padding: 5px 8px 6px; border-radius: 6px; background: var(--time-soft); border: 1px solid color-mix(in srgb, var(--time) 25%, transparent); }
 .todos-h { display: flex; align-items: center; gap: 4px; font: 600 10px/1.2 var(--ui); text-transform: uppercase; letter-spacing: .08em; color: var(--time); margin-bottom: 2px; }
 .todo { display: flex; align-items: flex-start; gap: 6px; min-height: 22px; }
@@ -1224,7 +1225,8 @@ function renderScene(n, num) {
       h('div', { class: 'body-acts' },
         h('button', { class: 'more' + (open > 1 ? ' on' : ''), 'aria-expanded': String(open > 1), onclick: () => { n.open = open > 1 ? 1 : 2; save(); renderTree(); } },
           icon('right'), 'Details', wc ? h('span', { class: 'wc' }, `${wc}w`) : null),
-        n.todos.length ? null : h('button', { class: 'more', onclick: () => { askingIn.add(n.id); renderTree(); focusQuestion(n.id); } }, icon('plus'), 'To-do or question')),
+        n.todos.length ? null : h('button', { class: 'more', onclick: () => { askingIn.add(n.id); renderTree(); focusQuestion(n.id); } }, icon('plus'), 'To-do or question'),
+        h('button', { class: 'more add-after', title: 'Add a new scene right after this one, in the same place', onclick: () => sceneAfter(n) }, icon('plus'), 'Scene after')),
       open > 1 ? area('details', n.details, 'Beats, dialogue fragments, research, things to remember…', (v) => { n.details = v; }) : null,
       n.todos.length || askingIn.has(n.id) ? todoList(n.todos, n.id, () => renderTree()) : null));
   }
@@ -1417,9 +1419,9 @@ function sceneMeta(n) {
   const chip = (kind, label, iconName, filled, content, extra = {}) => h('button', Object.assign({ class: 'mchip' + (filled ? '' : ' empty'), onclick: pick(kind), title: label }, extra),
     h('span', { class: 'mk' }, icon(iconName), label), filled ? content : h('span', { class: 'mv add' }, '+ Add'));
   return h('div', { class: 'smeta' },
-    chip('pov', 'POV', 'eye', pov, pov && [h('span', { class: 'av', style: `--c:${pov.color}` }, initials(pov.name)), h('span', { class: 'mv' }, firstName(pov.name))]),
+    chip('pov', 'POV', 'eye', pov, pov && [h('span', { class: 'av', style: `--c:${pov.color}` }, initials(pov.name)), h('span', { class: 'mv' }, tagName(pov))]),
     chip('place', 'Place', 'pin', pl, pl && [h('span', { class: 'swatch sq', style: `--c:${pl.color}` }), h('span', { class: 'mv' }, pl.name)]),
-    chip('chars', 'Cast', 'people', cs.length, cs.length && h('span', { class: 'mv' }, cs.map((c) => firstName(c.name)).join(', '))),
+    chip('chars', 'Cast', 'people', cs.length, cs.length && h('span', { class: 'mv' }, cs.map(tagName).join(', '))),
     chip('threads', 'Threads', 'thread', ts.length, ts.length && [h('span', { class: 'tbars' }, ts.slice(0, 5).map((t) => h('span', { class: 'tbar', style: `--c:${t.color}` }))), h('span', { class: 'mv' }, ts.map((t) => t.name).join(', '))]));
 }
 // Names of characters marked "Highlight in scene titles" get their colour behind them in scene titles.
@@ -2147,6 +2149,14 @@ function openSceneEditor(start, opts = {}) {
   draw();
   if (opts.isNew || !TOUCH) focusTitle();
 }
+// A new scene straight after this one, starting in the same place.
+function sceneAfter(n) {
+  const hit = find(n.id); if (!hit) return;
+  snapshot();
+  const x = blankScene(); x.place = n.place;
+  hit.list.splice(hit.list.indexOf(n) + 1, 0, x);
+  save(); renderAll(); focusNew(x.id);
+}
 function newOf(type) { if (type === 'time') { const t = blankTime(); openTimes.add(t.id); return t; } return type === 'scene' ? blankScene() : blankSection(); }
 function focusNew(id) {
   const hit = find(id);
@@ -2549,7 +2559,7 @@ if (/iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'Mac
 }
 
 // When a newer version of the app is published, offer to reload instead of running a stale saved copy.
-const APP_VERSION = '2026-10-31.15';
+const APP_VERSION = '2026-10-31.16';
 async function checkForUpdate() {
   if (!/github\.io$/.test(location.hostname)) return;
   try {
