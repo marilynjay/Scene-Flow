@@ -1878,13 +1878,64 @@ function moveNode(id, targetId, pos) {
   save(); renderTree();
 }
 
+/* ================= duplicates ================= */
+// Two scenes count as the same when their title, description and details all match.
+const sceneSig = (n) => [n.title, n.summary, n.details].map((x) => (x || '').trim().toLowerCase()).join('\u241f');
+// Drops scenes already in `seen` (adding the rest), then sections left empty whose title is already taken,
+// then time markers stranded by that (followed by another marker or nothing) whose label is already used.
+function pruneDupes(list, seen, secTitles, timeLabels) {
+  const out = [];
+  for (const n of list) {
+    if (n.type === 'scene') {
+      const sig = sceneSig(n);
+      if (seen.has(sig)) continue;
+      seen.add(sig); out.push(n);
+    } else if (n.type === 'section') {
+      const had = n.children.length;
+      n.children = pruneDupes(n.children, seen, secTitles, timeLabels);
+      const t = (n.title || '').trim().toLowerCase();
+      if (had && !n.children.length && secTitles.has(t)) continue;
+      secTitles.add(t); out.push(n);
+    } else out.push(n);
+  }
+  return out.filter((n, i) => {
+    if (n.type !== 'time') return true;
+    const key = `${(n.label || '').trim().toLowerCase()}|${n.month}`;
+    const nextItem = out[i + 1];
+    const stranded = !nextItem || nextItem.type === 'time';
+    if (stranded && timeLabels.has(key)) return false;
+    timeLabels.add(key); return true;
+  });
+}
+function bookIndex() {
+  const seen = new Set(), secTitles = new Set(), timeLabels = new Set();
+  walk(everything(), (n) => {
+    if (n.type === 'scene') seen.add(sceneSig(n));
+    if (n.type === 'section' && n !== S.holding) secTitles.add((n.title || '').trim().toLowerCase());
+    if (n.type === 'time') timeLabels.add(`${(n.label || '').trim().toLowerCase()}|${n.month}`);
+  });
+  return { seen, secTitles, timeLabels };
+}
+function countScenes(list) { let k = 0; walk(list, (n) => { if (n.type === 'scene') k++; }); return k; }
+function removeDuplicates() {
+  const before = countScenes(everything());
+  snapshot();
+  const seen = new Set(), secTitles = new Set(), timeLabels = new Set();
+  S.items = pruneDupes(S.items, seen, secTitles, timeLabels);
+  S.holding.children = pruneDupes(S.holding.children, seen, secTitles, timeLabels);
+  const removed = before - countScenes(everything());
+  if (!removed) { undoStack.pop(); toast('No duplicate scenes found'); return; }
+  save(); renderAll();
+  toast(`Removed ${removed} duplicate scene${removed === 1 ? '' : 's'}`, 'Undo', undo);
+}
+
 /* ================= backup modal ================= */
 function openBackup() {
   closePop();
   const json = JSON.stringify(S, null, 1);
   const ta = h('textarea', { id: 'backup-json', spellcheck: 'false', 'aria-label': 'Outline data' }); ta.value = json;
   const file = h('input', { type: 'file', accept: '.json,application/json', hidden: true,
-    onchange: () => { const f = file.files[0]; if (!f) return; const rd = new FileReader(); rd.onload = () => { ta.value = rd.result; armed = false; replaceBtn.textContent = 'Replace outline with this'; }; rd.readAsText(f); } });
+    onchange: () => { const f = file.files[0]; if (!f) return; const rd = new FileReader(); rd.onload = () => { ta.value = rd.result; armed = false; replaceBtn.textContent = 'Replace outline with this'; mergeArmed = false; mergeBtn.textContent = 'Add from file'; mergeBtn.classList.remove('warn'); }; rd.readAsText(f); } });
   let armed = false;
   const replaceBtn = h('button', { class: 'btn warn', onclick: () => {
     let next;
@@ -1897,9 +1948,24 @@ function openBackup() {
     if (!newArmed) { newArmed = true; newBtn.textContent = 'Click again to clear everything'; return; }
     newBook();
   } }, 'Start a new, empty book');
+  let mergeArmed = false;
   const mergeBtn = h('button', { class: 'btn', title: 'Adds what’s new in the file: characters, places and plot threads not in your lists yet, its sections and scenes at the end of your outline, and weather for any empty months. Nothing you already have is changed or removed.', onclick: () => {
     let next;
     try { next = normalize(JSON.parse(ta.value)); } catch (err) { toast('That text isn’t a valid backup. Paste the full text you copied, starting with {'); return; }
+    // Scenes already in the book are skipped; ask first so a backup of this same book isn't added twice.
+    const idx = bookIndex();
+    let fileScenes = 0, already = 0;
+    walk([...next.items, next.holding], (x) => { if (x.type === 'scene') { fileScenes++; if (idx.seen.has(sceneSig(x))) already++; } });
+    if (already && !mergeArmed) {
+      mergeArmed = true;
+      mergeBtn.textContent = already === fileScenes
+        ? `All ${fileScenes} scenes are already in your book. Click again to add only new characters, places and weather`
+        : `${already} of ${fileScenes} scenes are already in your book. Click again to add only the ${fileScenes - already} new ones`;
+      mergeBtn.classList.add('warn');
+      return;
+    }
+    next.items = pruneDupes(next.items, idx.seen, idx.secTitles, idx.timeLabels);
+    next.holding.children = pruneDupes(next.holding.children, idx.seen, idx.secTitles, idx.timeLabels);
     snapshot();
     // People, places and threads are matched by name, so the file's scenes point at the ones already in your lists.
     const idMap = new Map();
@@ -1931,8 +1997,7 @@ function openBackup() {
       });
       return copy;
     });
-    let sc = 0;
-    walk([...next.items, next.holding], (x) => { if (x.type === 'scene') sc++; });
+    const sc = countScenes([...next.items, next.holding]);
     S.items.push(...bring(next.items));
     S.holding.children.push(...bring(next.holding.children));
     if (sc) S.sample = false;
@@ -1962,7 +2027,7 @@ function openBackup() {
         h('button', { class: 'btn', onclick: () => file.click() }, 'Open file…'),
         h('span', { class: 'spacer' }),
         mergeBtn, replaceBtn, file),
-      h('div', { class: 'btns' }, newBtn, h('span', { class: 'spacer' }), h('button', { class: 'btn', onclick: () => scrim.remove() }, 'Close'))));
+      h('div', { class: 'btns' }, newBtn, h('button', { class: 'btn', title: 'Remove scenes that appear twice (same title, description and details), keeping the first copy', onclick: () => { scrim.remove(); removeDuplicates(); } }, 'Remove duplicate scenes'), h('span', { class: 'spacer' }), h('button', { class: 'btn', onclick: () => scrim.remove() }, 'Close'))));
   document.body.append(scrim);
 }
 
@@ -2138,7 +2203,7 @@ if (/iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'Mac
 }
 
 // When a newer version of the app is published, offer to reload instead of running a stale saved copy.
-const APP_VERSION = '2026-10-31.3';
+const APP_VERSION = '2026-10-31.4';
 async function checkForUpdate() {
   if (!/github\.io$/.test(location.hostname)) return;
   try {
