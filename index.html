@@ -223,6 +223,10 @@ main {
 .caret-b:hover { background: var(--line); color: var(--fg); }
 .caret-b svg { transition: transform .12s; }
 .caret-b.open svg { transform: rotate(90deg); }
+.caret-b.part { color: var(--accent); }
+.desc-b { display: grid; place-items: center; width: 18px; height: 18px; border-radius: 3px; color: var(--faint); flex: none; }
+.desc-b.on { color: var(--accent); }
+.desc-b:hover { background: var(--line); color: var(--fg); }
 .caret-b.dimmed { color: var(--faint); }
 .dots { opacity: 0; }
 .row:hover .dots, .row:focus-within .dots { opacity: 1; }
@@ -644,7 +648,7 @@ let railOpen = true;
 const undoStack = [];
 
 function blankScene(title = '') { return { id: uid(), type: 'scene', title, summary: '', details: '', pov: null, place: null, chars: [], threads: [], todos: [], status: 0, open: 0 }; }
-function blankSection(title = '') { return { id: uid(), type: 'section', title, summary: '', details: '', open: 0, collapsed: false, children: [] }; }
+function blankSection(title = '') { return { id: uid(), type: 'section', title, summary: '', details: '', open: 0, show: 2, showDesc: true, collapsed: false, children: [] }; }
 function blankHolding() { return { id: 'holding', type: 'section', title: 'Holding', collapsed: false, children: [] }; }
 function blankTime(label = '') { return { id: uid(), type: 'time', label, month: 0, weather: '' }; }
 
@@ -806,10 +810,19 @@ function normalize(s) {
   // Outlines saved before the example was marked: recognise the untouched example book by its title.
   if (s.sample == null && s.title === 'Untitled novel (example)' && s.characters.some((c) => c.name === 'Ellie Hart')) s.sample = true;
   if (!s.holding || !Array.isArray(s.holding.children)) s.holding = blankHolding();
+  // The view buttons used to switch global modes; they now set each section, which can then be opened on its own.
+  const oldView = s.ui.headingsOnly ? -1 : s.ui.scenesHidden ? 0 : s.ui.level === 1 ? 1 : null;
+  delete s.ui.headingsOnly; delete s.ui.scenesHidden;
+  if (![0, 1, 2].includes(s.ui.rootShow)) s.ui.rootShow = oldView === -1 ? 0 : oldView === 0 ? 1 : 2;
   Object.assign(s.holding, { id: 'holding', type: 'section', title: 'Holding' });
   walk([...s.items, s.holding], (n) => {
     n.id = n.id || uid();
-    if (n.type === 'section') { n.children = Array.isArray(n.children) ? n.children : []; n.summary = n.summary || ''; n.details = n.details || ''; n.open = n.open ? 1 : 0; }
+    if (n.type === 'section') {
+      n.children = Array.isArray(n.children) ? n.children : []; n.summary = n.summary || ''; n.details = n.details || ''; n.open = n.open ? 1 : 0;
+      // show: 0 = sub-sections only, 1 = plus time markers, 2 = everything inside. showDesc: description visible.
+      if (![0, 1, 2].includes(n.show)) n.show = oldView === -1 ? 0 : oldView === 0 ? 1 : 2;
+      if (typeof n.showDesc !== 'boolean') n.showDesc = !(oldView === -1 || oldView === 1);
+    }
     if (n.type === 'scene') { n.chars = Array.isArray(n.chars) ? n.chars : []; n.threads = Array.isArray(n.threads) ? n.threads : []; n.todos = fixTodos(n.todos); n.open = n.open || 0; n.status = n.status || 0; n.heat = n.heat >= 1 && n.heat <= 5 ? n.heat : 0; }
   });
   return s;
@@ -904,10 +917,10 @@ function renderTree() {
   const nums = new Map(); let k = 0;
   walk(S.items, (n) => { if (n.type === 'scene') nums.set(n.id, ++k); });
   const frag = document.createDocumentFragment();
-  renderList(S.items, frag, 0, nums);
+  renderList(S.items, frag, 0, nums, S.ui.rootShow);
   root.replaceChildren(frag);
-  if (S.ui.scenesHidden && S.items.length) root.prepend(h('div', { class: 'view-note' }, icon('eye'), S.ui.headingsOnly ? 'Showing section titles only. ' : `Scenes are hidden (${(() => { let k = 0; walk(S.items, (x) => { if (x.type === 'scene') k++; }); return k; })()}). `,
-    h('button', { onclick: () => setLevel(1) }, 'Show scene titles')));
+  if ((S.ui.level === -1 || S.ui.level === 0) && S.items.length) root.prepend(h('div', { class: 'view-note' }, icon('eye'), 'Scenes are tucked away. Tap a section’s arrow to open it, or ',
+    h('button', { onclick: () => setLevel(1) }, 'show every scene title'), '.'));
   if (!S.items.length) root.append(h('div', { class: 'emptykid' }, 'Nothing here yet. Start with a section (like “Part One” or “Arrival day”) or a scene below.'));
   else if (hiding() && !root.querySelector('.scene')) root.append(h('div', { class: 'emptykid' }, 'No scenes match this filter yet.'));
   setKids($('#holding'), renderHolding(nums));
@@ -942,7 +955,8 @@ function reveal(id) {
   const path = [];
   const dig = (list) => { for (const n of list) { if (n.id === id) return true; if (n.children) { path.push(n); if (dig(n.children)) return true; path.pop(); } } return false; };
   dig(everything());
-  path.forEach((sec) => { sec.collapsed = false; });
+  path.forEach((sec) => { sec.collapsed = false; sec.show = 2; });
+  if (path.length === 0 || path[0] !== S.holding) S.ui.rootShow = 2;
   save(); renderTree();
   const el = $(`[data-id="${id}"]`);
   if (el) { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash'); }
@@ -962,14 +976,14 @@ function openHeat(anchor, scene) {
   pop.style.minWidth = '260px';
   pop.querySelector('.mi').focus();
 }
-function renderList(list, into, depth, nums) {
+function renderList(list, into, depth, nums, show = 2) {
   for (const n of list) {
-    if (S.ui.scenesHidden && n.type === 'scene') continue;
-    if (S.ui.headingsOnly && n.type === 'time') continue;
+    if (n.type === 'scene' && show < 2) continue;
+    if (n.type === 'time' && show < 1) continue;
     if (hiding() && ((n.type === 'scene' && !sceneMatches(n)) || (n.type === 'section' && !sectionMatches(n)))) continue;
     if (n.type === 'section') into.append(renderSection(n, depth, nums));
     else if (n.type === 'scene') into.append(renderScene(n, nums.get(n.id)));
-    else if (n.type === 'time') into.append(renderTime(n));
+    else if (n.type === 'time') into.append(renderTime(n, show < 2));
   }
 }
 
@@ -985,7 +999,7 @@ function dotsBtn(n) {
 
 const describing = new Set();   // sections showing an empty description box
 function describeSection(n) {
-  if (S.ui.headingsOnly) { S.ui.headingsOnly = false; S.ui.scenesHidden = false; S.ui.level = 1; renderBar(); }
+  n.showDesc = true;
   describing.add(n.id); renderTree();
   const f = () => $(`[data-id="${n.id}"] > .sec-body textarea.ssum`)?.focus(); f(); setTimeout(f);
 }
@@ -996,15 +1010,19 @@ function renderSection(n, depth, nums) {
   const add = (type) => (e) => { e.stopPropagation(); addInside(n, type); };
   const row = h('div', { class: 'row' },
     grip(),
-    h('button', { class: 'caret-b' + (n.collapsed ? '' : ' open'), title: 'Collapse / expand (Alt-click: everything inside)', 'aria-expanded': String(!n.collapsed),
+    h('button', { class: 'caret-b' + (n.collapsed ? '' : n.show < 2 ? ' part' : ' open'),
+      title: n.collapsed || n.show < 2 ? 'Open this section (Alt-click: everything inside)' : 'Fold this section (Alt-click: everything inside)', 'aria-expanded': String(!n.collapsed && n.show === 2),
       onclick: (e) => {
-        const to = !n.collapsed;
-        n.collapsed = to;
-        if (e.altKey) walk(n.children, (x) => { if (x.type === 'section') x.collapsed = to; if (x.type === 'scene' && to) x.open = 0; });
-        save(); renderTree();
+        const fold = !n.collapsed && n.show === 2;
+        const apply = (x) => { if (fold) x.collapsed = true; else { x.collapsed = false; x.show = 2; } };
+        apply(n);
+        if (e.altKey) walk(n.children, (x) => { if (x.type === 'section') apply(x); if (x.type === 'scene' && fold) x.open = 0; });
+        S.ui.level = null; save(); renderBar(); renderTree();
       } }, icon('right')),
     editable('stitle', n.title, 'Untitled section', (v) => { n.title = v; }),
     h('span', { class: 'count' }, count ? `${count}` : ''),
+    n.summary || n.details ? h('button', { class: 'desc-b' + (n.showDesc ? ' on' : ''), title: n.showDesc ? 'Hide description' : 'Show description', 'aria-pressed': String(!!n.showDesc),
+      onclick: (e) => { e.stopPropagation(); n.showDesc = !n.showDesc; S.ui.level = null; save(); renderBar(); renderTree(); } }, icon('note')) : null,
     h('span', { class: 'acts' },
       n.summary || describing.has(n.id) ? null : h('button', { onclick: (e) => { e.stopPropagation(); describeSection(n); }, title: 'Describe what happens in this section' }, '+ Description'),
       h('button', { class: 'act-scene', onclick: add('scene'), title: 'Add a scene at the end of this section' }, '+ Scene'),
@@ -1012,8 +1030,7 @@ function renderSection(n, depth, nums) {
       h('button', { onclick: add('section'), title: 'Add a sub-section' }, '+ Section')),
     dotsBtn(n));
   const node = h('div', { class: `node section d${Math.min(depth, 3)}${anyMatch ? '' : ' dim'}`, 'data-id': n.id }, row);
-  // Section descriptions hide in the Headings and Titles views (unless one is being written).
-  if ((n.summary || n.details || describing.has(n.id)) && ((S.ui.level !== -1 && S.ui.level !== 1) || describing.has(n.id))) {
+  if ((n.summary || n.details || describing.has(n.id)) && (n.showDesc || describing.has(n.id))) {
     const wc = words(n.details);
     const sum = area('ssum', n.summary, 'What happens in this section, in a sentence or two…', (v) => { n.summary = v; });
     sum.addEventListener('blur', () => { if (!n.summary.trim() && !n.details.trim() && describing.delete(n.id)) renderTree(); });
@@ -1025,9 +1042,9 @@ function renderSection(n, depth, nums) {
   }
   if (!n.collapsed) {
     const kids = h('div', { class: 'kids' });
-    renderList(n.children, kids, depth + 1, nums);
+    renderList(n.children, kids, depth + 1, nums, n.show);
     if (!n.children.length) kids.append(h('div', { class: 'emptykid' }, 'Empty. ', h('button', { onclick: () => addInside(n, 'scene') }, 'Add a scene'), ' or drag one onto this heading.'));
-    if (kids.children.length || !S.ui.scenesHidden) node.append(kids);
+    if (kids.children.length || n.show === 2) node.append(kids);
   }
   return node;
 }
@@ -1044,7 +1061,7 @@ function renderHolding(nums) {
   const node = h('div', { class: 'node section holding', 'data-id': 'holding' }, row);
   if (!hd.collapsed) {
     const kids = h('div', { class: 'kids' });
-    renderList(hd.children, kids, 1, nums);
+    renderList(hd.children, kids, 1, nums, 2);
     if (!hd.children.length) kids.append(h('div', { class: 'emptykid' }, 'Nothing set aside. Use a scene’s ⋯ menu → Move to holding, or drag a scene onto this heading.'));
     node.append(kids);
   }
@@ -1287,10 +1304,10 @@ function plaques(n) {
       h('span', { class: 't' }, pov ? firstName(pov.name) : 'POV')));
 }
 
-function renderTime(n) {
+function renderTime(n, slim) {
   const clim = n.month ? S.climate[n.month - 1] : '';
-  // In the Sections view a time marker is a slim divider; it's edited in the other views.
-  if (S.ui.scenesHidden) return h('div', { class: 'node time slim', 'data-id': n.id, title: [n.label, n.month ? MONTHS[n.month - 1] : '', n.weather || clim].filter(Boolean).join(' · ') },
+  // Where scenes are hidden a time marker is a slim divider; it's edited once its section is open.
+  if (slim) return h('div', { class: 'node time slim', 'data-id': n.id, title: [n.label, n.month ? MONTHS[n.month - 1] : '', n.weather || clim].filter(Boolean).join(' · ') },
     h('div', { class: 'row' }, icon('clock'), h('span', { class: 'tl' }, n.label || 'Time passes'), n.month ? h('span', { class: 'tm' }, MONTHS[n.month - 1]) : null));
   const sel = h('select', { title: 'Month (fills in typical weather from your climate table)', 'aria-label': 'Month',
     onchange: (e) => { n.month = +e.target.value; save(); renderTree(); } },
@@ -1311,7 +1328,7 @@ function renderBar() {
   const bar = $('#bar');
   const levels = [['Headings', -1, 'Section titles only', 'Headings'], ['Sections', 0, 'Every section and its description, with scenes hidden', 'Sections'],
     ['Titles', 1, 'Open every section and show scene titles only', 'Titles'], ['Descriptions', 2, 'Show each scene’s short description', 'Desc.'], ['Everything', 3, 'Show descriptions and details', 'All']];
-  const activeLevel = S.ui.headingsOnly ? -1 : S.ui.scenesHidden ? 0 : null;
+  const activeLevel = S.ui.level == null ? null : S.ui.level;
   const fl = filterTarget();
   const searchInput = h('input', { id: 'q', type: 'search', placeholder: 'Search scenes  /', value: query, 'aria-label': 'Search scenes',
     oninput: (e) => { query = e.target.value.trim(); renderTree(); } });
@@ -1347,15 +1364,17 @@ function renderStat() {
   const held = scenesIn(S.holding);
   el.textContent = filtering() ? `${match}/${total} scenes` : `${total} scenes · ${done} done${held ? ` · ${held} held` : ''}`;
 }
-// Level -1 shows section titles only; 0 is the Sections view (descriptions and time markers, no scenes).
+// The view buttons are presets: they set every section and scene, and each can then be opened or folded on its own.
+// -1 Headings: section titles only · 0 Sections: plus descriptions and time markers · 1 Titles · 2 Descriptions · 3 Everything.
 function setLevel(l) {
   S.ui.level = l;
-  S.ui.scenesHidden = l <= 0;
-  S.ui.headingsOnly = l === -1;
+  const show = l === -1 ? 0 : l === 0 ? 1 : 2;
+  S.ui.rootShow = show;
   walk(everything(), (n) => {
-    if (n.type === 'section') { n.collapsed = false; n.open = l === 3 ? 1 : 0; }
+    if (n.type === 'section') { n.collapsed = false; n.show = show; n.showDesc = l === 0 || l >= 2; n.open = l === 3 ? 1 : 0; }
     if (n.type === 'scene' && l > 0) n.open = l - 1;
   });
+  S.holding.show = 2;
   save(); renderBar(); renderTree();
 }
 function applyRail() {
@@ -1791,10 +1810,9 @@ function focusNew(id) {
     if (el) { el.focus(); el.scrollIntoView({ block: 'nearest' }); }
   });
 }
-function showScenesFor(type) { if (type === 'scene' && S.ui.scenesHidden) { S.ui.scenesHidden = false; S.ui.headingsOnly = false; renderBar(); } }
-function addInside(sec, type) { showScenesFor(type); snapshot(); const x = newOf(type); sec.children.push(x); sec.collapsed = false; save(); renderAll(); focusNew(x.id); }
-function addAfter(n, type) { showScenesFor(type); snapshot(); const hit = find(n.id); const x = newOf(type); hit.list.splice(hit.list.indexOf(n) + 1, 0, x); save(); renderAll(); focusNew(x.id); }
-function addRoot(type) { showScenesFor(type); snapshot(); const x = newOf(type); S.items.push(x); save(); renderAll(); focusNew(x.id); }
+function addInside(sec, type) { sec.show = 2; snapshot(); const x = newOf(type); sec.children.push(x); sec.collapsed = false; save(); renderAll(); focusNew(x.id); }
+function addAfter(n, type) { const hit = find(n.id); if (hit.parent) hit.parent.show = 2; else S.ui.rootShow = 2; snapshot(); const x = newOf(type); hit.list.splice(hit.list.indexOf(n) + 1, 0, x); save(); renderAll(); focusNew(x.id); }
+function addRoot(type) { S.ui.rootShow = 2; snapshot(); const x = newOf(type); S.items.push(x); save(); renderAll(); focusNew(x.id); }
 function shift(n, d) {
   const { list } = find(n.id); const i = list.indexOf(n), j = i + d;
   if (j < 0 || j >= list.length) return;
@@ -2120,7 +2138,7 @@ if (/iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'Mac
 }
 
 // When a newer version of the app is published, offer to reload instead of running a stale saved copy.
-const APP_VERSION = '2026-10-31.2';
+const APP_VERSION = '2026-10-31.3';
 async function checkForUpdate() {
   if (!/github\.io$/.test(location.hostname)) return;
   try {
