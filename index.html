@@ -387,6 +387,9 @@ textarea::placeholder { color: var(--faint); }
 .ch-item .chk { width: 14px; display: grid; place-items: center; }
 .se-foot { flex-wrap: wrap; }
 @media (hover: none) { .se-title, .ch-search { font-size: 16px; } .ch-item { min-height: 40px; font-size: 15px; } .ch-chip { height: 32px; font-size: 14px; } .ch-q { height: 32px; font-size: 13.5px; } .heat-b, .mi-status button { height: 34px; } }
+.povtag { flex: none; max-width: 11ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; height: 18px; padding: 0 7px; border-radius: 9px;
+  font: 600 10.5px/18px var(--ui); color: color-mix(in srgb, var(--c) 72%, var(--fg)); background: color-mix(in srgb, var(--c) 15%, transparent); border: 1px solid color-mix(in srgb, var(--c) 35%, transparent); }
+.povtag.none { color: var(--faint); background: none; border: 1px dashed var(--line); font-weight: 400; }
 .smeta { display: flex; flex-wrap: wrap; gap: 4px; padding: 1px 0 2px; }
 .mchip { display: inline-flex; align-items: center; gap: 5px; max-width: 100%; min-height: 22px; padding: 1px 8px 1px 6px; border-radius: 11px; border: 1px solid var(--line); background: var(--bg); font-size: var(--fs-s); color: var(--fg); text-align: left; }
 .mchip:hover { border-color: var(--line-strong); }
@@ -1205,6 +1208,7 @@ function renderScene(n, num) {
       onclick: (e) => { e.stopPropagation(); openPicker(e.currentTarget, 'place', n); } }, placeTag(placeById(n.place))) : null,
     highlightTitle(TOUCH ? h('button', { class: 'title tbtn', 'data-ph': 'Untitled scene', onclick: () => openSceneEditor(n) }) : editable('title', n.title, 'Untitled scene', (v) => { n.title = v; }), () => n.title),
     open === 0 && n.summary ? h('span', { class: 'peek', onclick: toggle, title: n.summary }, n.summary) : h('span', { class: 'fill', onclick: toggle }),
+    S.ui.showPov ? povTag(n) : null,
     openCount(n) ? h('button', { class: 'qbadge', title: openItems(n).map((t) => (t.kind === 'question' ? '? ' : '• ') + t.text).join('\n'), 'aria-label': `${openCount(n)} open to-dos and questions`,
       onclick: () => { n.open = Math.max(n.open || 0, 1); save(); renderTree(); } }, icon(openItems(n).some((t) => t.kind !== 'question') ? 'pen' : 'q'), openCount(n)) : null,
     dotsBtn(n));
@@ -1451,6 +1455,19 @@ function highlightTitle(el, getText) {
   return el;
 }
 
+// With the POV button on, each scene row ends with its POV character's first name (a dash when unset).
+// Short name for tags: a quoted nickname, else the surname for titled people (Dean Wells → Wells), else the first name.
+function tagName(c) {
+  const nick = (c.name || '').match(/[“"]([^”"]+)[”"]/); if (nick) return nick[1];
+  const first = (c.name || '').trim().split(/\s+/)[0] || '';
+  const parts = nameParts(c.name);
+  return HONORIFIC.test(first) && parts.length ? parts[parts.length - 1] : firstName(c.name);
+}
+function povTag(n) {
+  const pov = charById(n.pov);
+  return h('button', { class: 'povtag' + (pov ? '' : ' none'), style: pov ? `--c:${pov.color}` : null, title: pov ? `POV: ${pov.name} (tap to change)` : 'No POV yet (tap to set)',
+    onclick: (e) => { e.stopPropagation(); openPicker(e.currentTarget, 'pov', n); } }, pov ? tagName(pov) : '—');
+}
 function plaques(n) {
   const pov = charById(n.pov);
   const pl = placeById(n.place);
@@ -1535,6 +1552,8 @@ function renderBar() {
       h('span', { class: 'lg' }, label), h('span', { class: 'sm' }, short)))),
     h('button', { class: 'tb', title: 'Every to-do and open question in the book', 'aria-label': 'To-dos and questions', onclick: openQuestions },
       icon('pen'), h('span', { class: 'lbl' }, 'To-dos'), totalOpen() ? h('span', { class: 'qcount' }, totalOpen()) : null),
+    h('button', { class: 'tb' + (S.ui.showPov ? ' on' : ''), 'aria-pressed': String(!!S.ui.showPov), title: S.ui.showPov ? 'Hide POV on scene rows' : 'Show each scene’s POV on its row',
+      onclick: () => { S.ui.showPov = !S.ui.showPov; save(); renderBar(); renderTree(); toast(S.ui.showPov ? 'Showing POV on scenes' : 'POV hidden'); } }, icon('eye'), 'POV'),
     // Heatmap cycles: colours + chart → colours only → off.
     h('button', { class: 'tb' + (S.ui.heat ? ' on' : ''), 'aria-label': 'Heatmap: ' + heatModeLabel(),
       title: `Heatmap: ${heatModeLabel()} (tap for ${HEAT_MODES[(heatMode() + 1) % 3]})`, onclick: cycleHeat },
@@ -2530,7 +2549,7 @@ if (/iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'Mac
 }
 
 // When a newer version of the app is published, offer to reload instead of running a stale saved copy.
-const APP_VERSION = '2026-10-31.14';
+const APP_VERSION = '2026-10-31.15';
 async function checkForUpdate() {
   if (!/github\.io$/.test(location.hostname)) return;
   try {
