@@ -1032,32 +1032,40 @@ function describeSection(n) {
 }
 // Tapping a section's name steps through how it (and everything inside) is shown; renaming is in its menu.
 const renaming = new Set();
-const SECTION_STEPS = ['Folded', 'Titles', 'Descriptions', 'Everything'];
+const SECTION_STEPS = ['Folded', 'Sub-sections', 'Titles', 'Descriptions', 'Everything'];
+// Sections without sub-sections skip the Sub-sections step.
+const stepsFor = (n) => (n.children.some((c) => c.type === 'section') ? SECTION_STEPS : SECTION_STEPS.filter((x) => x !== 'Sub-sections'));
 function sectionTitle(n) {
   if (renaming.has(n.id)) {
     const ed = editable('stitle', n.title, 'Untitled section', (v) => { n.title = v; });
     ed.addEventListener('blur', () => setTimeout(() => { if (renaming.delete(n.id)) renderTree(); }));
     return ed;
   }
-  const next = SECTION_STEPS[(sectionStep(n) + 1) % SECTION_STEPS.length];
+  const steps = stepsFor(n), next = steps[(Math.max(0, steps.indexOf(sectionStep(n))) + 1) % steps.length];
   return h('button', { class: 'stitle sbtn', title: `Tap to show: ${next}. Rename from the ⋯ menu.`,
     onclick: () => cycleSection(n), ondblclick: (e) => { if (!TOUCH) { e.preventDefault(); renameSection(n); } } }, n.title || 'Untitled section');
 }
-const sectionStep = (n) => (n.collapsed ? 0 : Number.isInteger(n.step) ? n.step : 1);
+// Earlier versions stored the step as a number (1 Titles, 2 Descriptions, 3 Everything).
+const sectionStep = (n) => (n.collapsed ? 'Folded' : typeof n.step === 'string' ? n.step : ({ 2: 'Descriptions', 3: 'Everything' })[n.step] || 'Titles');
 function cycleSection(n) {
-  const step = (sectionStep(n) + 1) % SECTION_STEPS.length;
+  const steps = stepsFor(n);
+  const step = steps[(Math.max(0, steps.indexOf(sectionStep(n))) + 1) % steps.length];
   n.step = step;
   // Only scenes and sub-sections change; section descriptions and details stay as they are (see the notes icon).
-  if (step === 0) n.collapsed = true;
-  else {
+  if (step === 'Folded') n.collapsed = true;
+  else if (step === 'Sub-sections') {
+    n.collapsed = false; n.show = 1;
+    n.children.forEach((x) => { if (x.type === 'section') { x.collapsed = true; x.step = 'Folded'; } });
+  } else {
+    const open = { Titles: 0, Descriptions: 1, Everything: 2 }[step];
     n.collapsed = false; n.show = 2;
     walk(n.children, (x) => {
       if (x.type === 'section') { x.collapsed = false; x.show = 2; x.step = step; }
-      if (x.type === 'scene') x.open = step - 1;
+      if (x.type === 'scene') x.open = open;
     });
   }
   S.ui.level = null; save(); renderBar(); renderTree();
-  toast(`${n.title || 'Section'}: ${SECTION_STEPS[step]}`);
+  toast(`${n.title || 'Section'}: ${step}`);
 }
 function renameSection(n) {
   renaming.add(n.id); renderTree();
@@ -1493,7 +1501,7 @@ function setLevel(l) {
   const show = l === -1 ? 0 : l === 0 ? 1 : 2;
   S.ui.rootShow = show;
   walk(everything(), (n) => {
-    if (n.type === 'section') { n.collapsed = false; n.show = show; n.showDesc = l === 0 || l >= 2; n.open = l === 3 ? 1 : 0; n.step = l >= 1 ? l : 1; }
+    if (n.type === 'section') { n.collapsed = false; n.show = show; n.showDesc = l === 0 || l >= 2; n.open = l === 3 ? 1 : 0; n.step = l >= 1 ? ['Titles', 'Descriptions', 'Everything'][l - 1] : 'Sub-sections'; }
     if (n.type === 'scene' && l > 0) n.open = l - 1;
   });
   S.holding.show = 2;
@@ -2331,7 +2339,7 @@ if (/iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'Mac
 }
 
 // When a newer version of the app is published, offer to reload instead of running a stale saved copy.
-const APP_VERSION = '2026-10-31.9';
+const APP_VERSION = '2026-10-31.10';
 async function checkForUpdate() {
   if (!/github\.io$/.test(location.hostname)) return;
   try {
