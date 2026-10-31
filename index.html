@@ -1047,15 +1047,14 @@ const sectionStep = (n) => (n.collapsed ? 0 : Number.isInteger(n.step) ? n.step 
 function cycleSection(n) {
   const step = (sectionStep(n) + 1) % SECTION_STEPS.length;
   n.step = step;
-  if (step === 0) { n.collapsed = true; n.open = 0; }
+  // Only scenes and sub-sections change; section descriptions and details stay as they are (see the notes icon).
+  if (step === 0) n.collapsed = true;
   else {
     n.collapsed = false; n.show = 2;
     walk(n.children, (x) => {
-      if (x.type === 'section') { x.collapsed = false; x.show = 2; x.showDesc = step >= 2; x.open = step === 3 ? 1 : 0; x.step = step; }
+      if (x.type === 'section') { x.collapsed = false; x.show = 2; x.step = step; }
       if (x.type === 'scene') x.open = step - 1;
     });
-    if (step >= 2) n.showDesc = true;
-    if (step === 3) n.open = 1; else n.open = 0;
   }
   S.ui.level = null; save(); renderBar(); renderTree();
   toast(`${n.title || 'Section'}: ${SECTION_STEPS[step]}`);
@@ -2332,7 +2331,7 @@ if (/iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'Mac
 }
 
 // When a newer version of the app is published, offer to reload instead of running a stale saved copy.
-const APP_VERSION = '2026-10-31.8';
+const APP_VERSION = '2026-10-31.9';
 async function checkForUpdate() {
   if (!/github\.io$/.test(location.hostname)) return;
   try {
