@@ -560,6 +560,24 @@ html { touch-action: manipulation; }
 .mi.danger { color: var(--danger); }
 .mi[disabled] { color: var(--faint); cursor: default; background: none; }
 .msep { height: 1px; background: var(--line); margin: 3px 2px; }
+.pop.menu { width: 236px; max-height: min(78dvh, 560px); overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 1px; }
+.pop.menu .mi { flex: none; gap: 7px; }
+.mi.mi-primary { background: var(--accent); color: var(--panel); font-weight: 600; justify-content: center; min-height: 32px; border-radius: 6px; margin-bottom: 3px; }
+.mi.mi-primary:hover { background: var(--accent); filter: brightness(1.08); }
+.mi-row { display: flex; gap: 4px; padding: 2px; }
+.mi-row button { flex: 1 1 0; min-width: 0; height: 28px; padding: 0 4px; border: 1px solid var(--line); border-radius: 6px; font-size: var(--fs-s); color: var(--fg); white-space: nowrap; }
+.mi-row button:hover { background: var(--hover); }
+.mi-row button[disabled] { color: var(--faint); cursor: default; background: none; }
+.mi-label { font: 600 9.5px/1 var(--ui); text-transform: uppercase; letter-spacing: .08em; color: var(--faint); padding: 5px 6px 2px; }
+.pop.menu .mi-status { padding: 2px; flex-wrap: nowrap; }
+.pop.menu .mi-status button { flex: 1 1 0; justify-content: center; padding: 0 4px; }
+@media (hover: none) {
+  .pop.menu { width: 264px; }
+  .pop.menu .mi { min-height: 38px; font-size: 14.5px; }
+  .mi.mi-primary { min-height: 42px; font-size: 15px; }
+  .mi-row button { height: 36px; font-size: 13.5px; }
+  .pop.menu .mi-status button { height: 34px; font-size: 13px; }
+}
 .toast { position: fixed; z-index: 60; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); display: flex; align-items: center; gap: 10px; padding: 7px 8px 7px 12px; border-radius: 6px; background: var(--fg); color: var(--bg); box-shadow: var(--shadow); max-width: calc(100vw - 32px); }
 .toast button { color: var(--bg); font-weight: 600; text-decoration: underline; text-underline-offset: 2px; padding: 0 4px; }
 .scrim { position: fixed; inset: 0; z-index: 40; background: rgba(10, 14, 22, .35); display: grid; place-items: center; padding: 16px;  grid-template-columns: minmax(0, 1fr); justify-items: center;}
@@ -1831,7 +1849,7 @@ function closePop() {
 }
 // Phones get a full-width panel pinned to the top (clear of the keyboard) over a dimmed page; other screens get a popover by the button.
 function place(el, anchor) {
-  if (TOUCH) {
+  if (TOUCH && !(el.classList.contains('menu') && anchor)) {
     popScrim = h('div', { class: 'pop-scrim' });
     el.classList.add('sheet');
     el.append(h('button', { class: 'btn primary sheet-done', onclick: () => closePop() }, 'Done'));
@@ -1841,7 +1859,7 @@ function place(el, anchor) {
   document.body.append(el);
   const r = anchor.getBoundingClientRect(), w = el.offsetWidth, ht = el.offsetHeight;
   let left = Math.min(r.right - w, innerWidth - w - 8); left = Math.max(8, left);
-  let top = r.bottom + 4; if (top + ht > innerHeight - 8) top = Math.max(8, r.top - ht - 4);
+  let top = r.bottom + 4; if (top + ht > innerHeight - 8) top = Math.max(8, Math.min(r.top - ht - 4, innerHeight - ht - 8));
   el.style.left = left + 'px'; el.style.top = top + 'px';
 }
 function openPicker(anchor, kind, scene) {
@@ -1975,31 +1993,40 @@ function openMenu(anchor, n) {
   closePop();
   const hit = find(n.id); if (!hit) return;
   const idx = hit.list.indexOf(n);
-  const mi = (label, fn, opts = {}) => h('button', { class: 'mi' + (opts.danger ? ' danger' : ''), disabled: opts.disabled, onclick: () => { closePop(); fn(); } }, label);
+  const act = (fn) => () => { closePop(); fn(); };
+  const mi = (label, fn, opts = {}) => h('button', { class: 'mi' + (opts.danger ? ' danger' : ''), disabled: opts.disabled, onclick: act(fn) }, opts.icon ? icon(opts.icon) : null, label);
+  // Small side-by-side buttons for pairs of related actions.
+  const pair = (...btns) => h('div', { class: 'mi-row' }, btns.map(([label, fn, dis]) => h('button', { disabled: dis, onclick: act(fn) }, label)));
   const items = [];
-  if (n.type === 'section') {
-    items.push(mi('Rename', () => renameSection(n)), mi(n.summary ? 'Edit description' : 'Add description', () => describeSection(n)), h('div', { class: 'msep' }), mi('Add scene inside', () => addInside(n, 'scene')), mi('Add time marker inside', () => addInside(n, 'time')), mi('Add sub-section inside', () => addInside(n, 'section')), h('div', { class: 'msep' }), mi('Add section below', () => addAfter(n, 'section')));
-  } else {
-    items.push(mi('Add scene below', () => addAfter(n, 'scene')), mi('Add time marker below', () => addAfter(n, 'time')));
-    if (n.type === 'scene') items.unshift(mi('Edit scene', () => openSceneEditor(n)), h('div', { class: 'msep' }));
-    if (n.type === 'scene') items.push(
-      h('div', { class: 'mi-status', role: 'group', 'aria-label': 'Status' }, h('span', { class: 'k' }, 'Status'),
-        STATUS.map((label, i) => h('button', { class: (n.status || 0) === i ? 'on' : '', 'aria-pressed': String((n.status || 0) === i),
-          onclick: () => { n.status = i; save(); renderTree(); closePop(); } }, h('span', { class: 'st', 'data-s': i }), label))),
-      h('div', { class: 'msep' }),
-      mi('Turn into section', () => sceneToSection(n)),
-      mi('Add to-do or question', () => { n.open = Math.max(n.open || 0, 1); askingIn.add(n.id); save(); renderTree(); focusQuestion(n.id); }),
-      h('button', { class: 'mi', onclick: () => openSceneTasks(anchor, n) }, 'Tag with a change across scenes…', h('span', { class: 'k' }, '▸')));
-  }
+  if (n.type === 'scene') items.push(
+    h('button', { class: 'mi mi-primary', onclick: act(() => openSceneEditor(n)) }, icon('pen'), 'Edit scene'),
+    h('div', { class: 'mi-status', role: 'group', 'aria-label': 'Status' },
+      STATUS.map((label, i) => h('button', { class: (n.status || 0) === i ? 'on' : '', 'aria-pressed': String((n.status || 0) === i),
+        onclick: () => { n.status = i; save(); renderTree(); closePop(); } }, h('span', { class: 'st', 'data-s': i }), label))));
+  if (n.type === 'section') items.push(
+    pair(['Rename', () => renameSection(n)], [n.summary ? 'Description' : '+ Description', () => describeSection(n)]),
+    h('div', { class: 'msep' }),
+    h('div', { class: 'mi-label' }, 'Add inside'),
+    pair(['+ Scene', () => addInside(n, 'scene')], ['+ Time', () => addInside(n, 'time')], ['+ Sub-section', () => addInside(n, 'section')]),
+    mi('Add section below', () => addAfter(n, 'section')));
+  else items.push(
+    h('div', { class: 'msep' }),
+    pair(['+ Scene below', () => addAfter(n, 'scene')], ['+ Time below', () => addAfter(n, 'time')]));
+  if (n.type === 'scene') items.push(
+    mi('Add to-do or question', () => { n.open = Math.max(n.open || 0, 1); askingIn.add(n.id); save(); renderTree(); focusQuestion(n.id); }),
+    h('button', { class: 'mi', onclick: () => openSceneTasks(anchor, n) }, 'Tag with a change…', h('span', { class: 'k' }, '▸')),
+    mi('Turn into section', () => sceneToSection(n)));
   const inHolding = hit.parent === S.holding;
   items.push(h('div', { class: 'msep' }),
-    mi('Move up', () => shift(n, -1), { disabled: idx === 0 }),
-    mi('Move down', () => shift(n, 1), { disabled: idx === hit.list.length - 1 }),
-    h('button', { class: 'mi', onclick: () => openMoveTo(anchor, n) }, 'Move to…', h('span', { class: 'k' }, '▸')),
+    h('div', { class: 'mi-label' }, 'Move'),
+    h('div', { class: 'mi-row' },
+      h('button', { disabled: idx === 0, onclick: act(() => shift(n, -1)) }, '↑ Up'),
+      h('button', { disabled: idx === hit.list.length - 1, onclick: act(() => shift(n, 1)) }, '↓ Down'),
+      h('button', { onclick: () => openMoveTo(anchor, n) }, 'Move to…')),
     inHolding ? null : mi('Move to holding', () => moveTo(n, 'holding')),
     mi('Duplicate', () => { snapshot(); hit.list.splice(idx + 1, 0, cloneNode(n)); save(); renderAll(); }),
     h('div', { class: 'msep' }),
-    mi('Delete', () => removeNode(n), { danger: true }));
+    mi('Delete', () => removeNode(n), { danger: true, icon: 'trash' }));
   pop = h('div', { class: 'pop menu' }, items);
   place(pop, anchor);
 }
@@ -2569,8 +2596,9 @@ document.addEventListener('keydown', (e) => {
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
   if (e.key === '/') { e.preventDefault(); $('#q')?.focus(); }
 });
-addEventListener('resize', () => { if (!TOUCH) closePop(); applyRail(); });
-window.addEventListener('scroll', () => { if (!TOUCH) closePop(); }, { passive: true });
+const floatingPop = () => pop && !pop.classList.contains('sheet');
+addEventListener('resize', () => { if (floatingPop() && !TOUCH) closePop(); applyRail(); });
+window.addEventListener('scroll', () => { if (floatingPop()) closePop(); }, { passive: true });
 
 $('#rootadd').append(
   h('button', { onclick: () => addRoot('section') }, icon('plus'), 'Section'),
@@ -2584,7 +2612,7 @@ if (/iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'Mac
 }
 
 // When a newer version of the app is published, offer to reload instead of running a stale saved copy.
-const APP_VERSION = '2026-10-31.18';
+const APP_VERSION = '2026-10-31.19';
 async function checkForUpdate() {
   if (!/github\.io$/.test(location.hostname)) return;
   try {
