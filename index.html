@@ -568,6 +568,8 @@ html { touch-action: manipulation; }
 .mi-row button { flex: 1 1 0; min-width: 0; height: 28px; padding: 0 4px; border: 1px solid var(--line); border-radius: 6px; font-size: var(--fs-s); color: var(--fg); white-space: nowrap; }
 .mi-row button:hover { background: var(--hover); }
 .mi-row button[disabled] { color: var(--faint); cursor: default; background: none; }
+.mi.mi-nest { gap: 8px; }
+.mi.mi-nest .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .mi-label { font: 600 9.5px/1 var(--ui); text-transform: uppercase; letter-spacing: .08em; color: var(--faint); padding: 5px 6px 2px; }
 .pop.menu .mi-status { padding: 2px; flex-wrap: nowrap; }
 .pop.menu .mi-status button { flex: 1 1 0; justify-content: center; padding: 0 4px; }
@@ -2023,12 +2025,34 @@ function openMenu(anchor, n) {
       h('button', { disabled: idx === 0, onclick: act(() => shift(n, -1)) }, '↑ Up'),
       h('button', { disabled: idx === hit.list.length - 1, onclick: act(() => shift(n, 1)) }, '↓ Down'),
       h('button', { onclick: () => openMoveTo(anchor, n) }, 'Move to…')),
+    // Step out of the section it's in (landing right after it), or into the section just above it.
+    hit.parent && !inHolding ? h('button', { class: 'mi mi-nest', onclick: act(() => outdent(n)) }, '⇤', h('span', { class: 'nm' }, `Move out of “${hit.parent.title || 'Untitled section'}”`)) : null,
+    idx > 0 && hit.list[idx - 1].type === 'section' ? h('button', { class: 'mi mi-nest', onclick: act(() => indent(n)) }, '⇥', h('span', { class: 'nm' }, `Move into “${hit.list[idx - 1].title || 'Untitled section'}”`)) : null,
     inHolding ? null : mi('Move to holding', () => moveTo(n, 'holding')),
     mi('Duplicate', () => { snapshot(); hit.list.splice(idx + 1, 0, cloneNode(n)); save(); renderAll(); }),
     h('div', { class: 'msep' }),
     mi('Delete', () => removeNode(n), { danger: true, icon: 'trash' }));
   pop = h('div', { class: 'pop menu' }, items);
   place(pop, anchor);
+}
+function outdent(n) {
+  const hit = find(n.id); if (!hit || !hit.parent || hit.parent === S.holding) return;
+  const sec = hit.parent, up = find(sec.id); if (!up) return;
+  snapshot();
+  hit.list.splice(hit.list.indexOf(n), 1);
+  up.list.splice(up.list.indexOf(sec) + 1, 0, n);
+  if (up.parent) up.parent.show = 2; else S.ui.rootShow = 2;
+  save(); renderAll(); reveal(n.id);
+  toast(`Moved out of “${sec.title || 'Untitled section'}”`, 'Undo', undo);
+}
+function indent(n) {
+  const hit = find(n.id); if (!hit) return;
+  const sec = hit.list[hit.list.indexOf(n) - 1]; if (!sec || sec.type !== 'section') return;
+  snapshot();
+  hit.list.splice(hit.list.indexOf(n), 1);
+  sec.children.push(n); sec.collapsed = false; sec.show = 2;
+  save(); renderAll(); reveal(n.id);
+  toast(`Moved into “${sec.title || 'Untitled section'}”`, 'Undo', undo);
 }
 function openMoveTo(anchor, n) {
   closePop();
@@ -2612,7 +2636,7 @@ if (/iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'Mac
 }
 
 // When a newer version of the app is published, offer to reload instead of running a stale saved copy.
-const APP_VERSION = '2026-10-31.19';
+const APP_VERSION = '2026-10-31.20';
 async function checkForUpdate() {
   if (!/github\.io$/.test(location.hostname)) return;
   try {
