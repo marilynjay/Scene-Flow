@@ -234,6 +234,8 @@ main {
 /* sections */
 .section > .row { min-height: 26px; }
 .section .stitle { font-weight: 600; padding: 1px 3px; min-width: 6ch; }
+.stitle.sbtn { text-align: left; color: inherit; border-radius: 3px; cursor: pointer; }
+.stitle.sbtn:hover { background: var(--hover); }
 .section.d0 > .row .stitle { font: 600 14.5px/1.25 var(--book); }
 .section.d0 { margin-top: 8px; }
 .section.d0:first-child { margin-top: 0; }
@@ -1024,6 +1026,41 @@ function describeSection(n) {
   describing.add(n.id); renderTree();
   const f = () => $(`[data-id="${n.id}"] > .sec-body textarea.ssum`)?.focus(); f(); setTimeout(f);
 }
+// Tapping a section's name steps through how it (and everything inside) is shown; renaming is in its menu.
+const renaming = new Set();
+const SECTION_STEPS = ['Folded', 'Titles', 'Descriptions', 'Everything'];
+function sectionTitle(n) {
+  if (renaming.has(n.id)) {
+    const ed = editable('stitle', n.title, 'Untitled section', (v) => { n.title = v; });
+    ed.addEventListener('blur', () => setTimeout(() => { if (renaming.delete(n.id)) renderTree(); }));
+    return ed;
+  }
+  const next = SECTION_STEPS[(sectionStep(n) + 1) % SECTION_STEPS.length];
+  return h('button', { class: 'stitle sbtn', title: `Tap to show: ${next}. Rename from the ⋯ menu.`,
+    onclick: () => cycleSection(n), ondblclick: (e) => { if (!TOUCH) { e.preventDefault(); renameSection(n); } } }, n.title || 'Untitled section');
+}
+const sectionStep = (n) => (n.collapsed ? 0 : Number.isInteger(n.step) ? n.step : 1);
+function cycleSection(n) {
+  const step = (sectionStep(n) + 1) % SECTION_STEPS.length;
+  n.step = step;
+  if (step === 0) { n.collapsed = true; n.open = 0; }
+  else {
+    n.collapsed = false; n.show = 2;
+    walk(n.children, (x) => {
+      if (x.type === 'section') { x.collapsed = false; x.show = 2; x.showDesc = step >= 2; x.open = step === 3 ? 1 : 0; x.step = step; }
+      if (x.type === 'scene') x.open = step - 1;
+    });
+    if (step >= 2) n.showDesc = true;
+    if (step === 3) n.open = 1; else n.open = 0;
+  }
+  S.ui.level = null; save(); renderBar(); renderTree();
+  toast(`${n.title || 'Section'}: ${SECTION_STEPS[step]}`);
+}
+function renameSection(n) {
+  renaming.add(n.id); renderTree();
+  const f = () => { const el = $(`[data-id="${n.id}"] > .row .stitle`); if (el) { el.focus(); const r = document.createRange(); r.selectNodeContents(el); r.collapse(false); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); } };
+  f(); setTimeout(f);
+}
 function renderSection(n, depth, nums) {
   const count = scenesIn(n);
   let anyMatch = true;
@@ -1040,7 +1077,7 @@ function renderSection(n, depth, nums) {
         if (e.altKey) walk(n.children, (x) => { if (x.type === 'section') apply(x); if (x.type === 'scene' && fold) x.open = 0; });
         S.ui.level = null; save(); renderBar(); renderTree();
       } }, icon('right')),
-    editable('stitle', n.title, 'Untitled section', (v) => { n.title = v; }),
+    sectionTitle(n),
     h('span', { class: 'count' }, count ? `${count}` : ''),
     n.summary || n.details ? h('button', { class: 'desc-b' + (n.showDesc ? ' on' : ''), title: n.showDesc ? 'Hide description' : 'Show description', 'aria-pressed': String(!!n.showDesc),
       onclick: (e) => { e.stopPropagation(); n.showDesc = !n.showDesc; S.ui.level = null; save(); renderBar(); renderTree(); } }, icon('note')) : null,
@@ -1436,7 +1473,7 @@ function setLevel(l) {
   const show = l === -1 ? 0 : l === 0 ? 1 : 2;
   S.ui.rootShow = show;
   walk(everything(), (n) => {
-    if (n.type === 'section') { n.collapsed = false; n.show = show; n.showDesc = l === 0 || l >= 2; n.open = l === 3 ? 1 : 0; }
+    if (n.type === 'section') { n.collapsed = false; n.show = show; n.showDesc = l === 0 || l >= 2; n.open = l === 3 ? 1 : 0; n.step = l >= 1 ? l : 1; }
     if (n.type === 'scene' && l > 0) n.open = l - 1;
   });
   S.holding.show = 2;
@@ -1808,7 +1845,7 @@ function openMenu(anchor, n) {
   const mi = (label, fn, opts = {}) => h('button', { class: 'mi' + (opts.danger ? ' danger' : ''), disabled: opts.disabled, onclick: () => { closePop(); fn(); } }, label);
   const items = [];
   if (n.type === 'section') {
-    items.push(mi(n.summary ? 'Edit description' : 'Add description', () => describeSection(n)), h('div', { class: 'msep' }), mi('Add scene inside', () => addInside(n, 'scene')), mi('Add time marker inside', () => addInside(n, 'time')), mi('Add sub-section inside', () => addInside(n, 'section')), h('div', { class: 'msep' }), mi('Add section below', () => addAfter(n, 'section')));
+    items.push(mi('Rename', () => renameSection(n)), mi(n.summary ? 'Edit description' : 'Add description', () => describeSection(n)), h('div', { class: 'msep' }), mi('Add scene inside', () => addInside(n, 'scene')), mi('Add time marker inside', () => addInside(n, 'time')), mi('Add sub-section inside', () => addInside(n, 'section')), h('div', { class: 'msep' }), mi('Add section below', () => addAfter(n, 'section')));
   } else {
     items.push(mi('Add scene below', () => addAfter(n, 'scene')), mi('Add time marker below', () => addAfter(n, 'time')));
     if (n.type === 'scene') items.push(
@@ -1881,9 +1918,9 @@ function focusNew(id) {
     if (el) { el.focus(); el.scrollIntoView({ block: 'nearest' }); }
   });
 }
-function addInside(sec, type) { sec.show = 2; snapshot(); const x = newOf(type); sec.children.push(x); sec.collapsed = false; save(); renderAll(); focusNew(x.id); }
-function addAfter(n, type) { const hit = find(n.id); if (hit.parent) hit.parent.show = 2; else S.ui.rootShow = 2; snapshot(); const x = newOf(type); hit.list.splice(hit.list.indexOf(n) + 1, 0, x); save(); renderAll(); focusNew(x.id); }
-function addRoot(type) { S.ui.rootShow = 2; snapshot(); const x = newOf(type); S.items.push(x); save(); renderAll(); focusNew(x.id); }
+function addInside(sec, type) { sec.show = 2; snapshot(); const x = newOf(type); if (type === 'section') renaming.add(x.id); sec.children.push(x); sec.collapsed = false; save(); renderAll(); focusNew(x.id); }
+function addAfter(n, type) { const hit = find(n.id); if (hit.parent) hit.parent.show = 2; else S.ui.rootShow = 2; snapshot(); const x = newOf(type); if (type === 'section') renaming.add(x.id); hit.list.splice(hit.list.indexOf(n) + 1, 0, x); save(); renderAll(); focusNew(x.id); }
+function addRoot(type) { S.ui.rootShow = 2; snapshot(); const x = newOf(type); if (type === 'section') renaming.add(x.id); S.items.push(x); save(); renderAll(); focusNew(x.id); }
 function shift(n, d) {
   const { list } = find(n.id); const i = list.indexOf(n), j = i + d;
   if (j < 0 || j >= list.length) return;
@@ -2274,7 +2311,7 @@ if (/iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'Mac
 }
 
 // When a newer version of the app is published, offer to reload instead of running a stale saved copy.
-const APP_VERSION = '2026-10-31.6';
+const APP_VERSION = '2026-10-31.7';
 async function checkForUpdate() {
   if (!/github\.io$/.test(location.hostname)) return;
   try {
