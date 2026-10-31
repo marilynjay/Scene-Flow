@@ -153,7 +153,7 @@ main {
 .colour-pick input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
 .colour-pick .av { width: 26px; height: 26px; font-size: 11px; }
 .colour-pick .swatch { width: 18px; height: 18px; }
-.details-name { flex: 1; min-width: 0; font: 600 15px/1.2 var(--book); border: 1px solid transparent; border-radius: 4px; background: none; padding: 4px 6px; outline: 0; }
+.details-name { flex: 1 1 140px; min-width: 0; width: 0; font: 600 15px/1.2 var(--book); border: 1px solid transparent; border-radius: 4px; background: none; padding: 4px 6px; outline: 0; }
 .details-name:hover { border-color: var(--line); }
 .details-name:focus { border-color: var(--accent); background: var(--bg); }
 .profile { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; padding: 2px 2px 8px; }
@@ -194,7 +194,7 @@ main {
 @media (max-width: 600px) { .pf-arc { grid-template-columns: minmax(0, 1fr); } .pf-arrow { transform: rotate(90deg); justify-self: center; } .pf-grid { grid-template-columns: minmax(0, 1fr); } }
 @media (hover: none) { .pf-field input, .modal .pf-ta { font-size: 16px; } }
 .modal.notes { width: min(760px, 100%); height: min(780px, calc(100dvh - 32px)); }
-.notes-head { display: flex; align-items: center; gap: 8px; }
+.notes-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
 .notes-head .av { width: 22px; height: 22px; font-size: 10px; }
 .notes-head .swatch { width: 16px; height: 16px; }
 .notes-head h2 { flex: 1; min-width: 0; }
@@ -202,9 +202,8 @@ main {
 .modal textarea.notes-ta { flex: 1; height: auto; min-height: 200px; resize: none; font: 400 12.5px/1.55 var(--ui); white-space: pre-wrap; padding: 8px 10px; }
 .modal .hint { padding: 0; }
 .lib-note { width: 100%; margin: 0 0 4px 21px; width: calc(100% - 25px); border: 1px solid var(--line); border-radius: 4px; background: var(--panel); padding: 4px 6px; resize: none; font: 400 var(--fs-s)/1.4 var(--ui); color: var(--fg); min-height: 22px; overflow: hidden; }
-.lib-add { display: flex; align-items: center; gap: 5px; height: 22px; padding: 0 4px; color: var(--faint); }
-.lib-add input { border: 0; background: none; outline: 0; width: 100%; min-width: 0; color: var(--fg); }
-.lib-add input::placeholder { color: var(--faint); }
+.lib-add { display: flex; align-items: center; gap: 5px; height: 22px; padding: 0 4px; color: var(--muted); border-radius: 4px; width: 100%; text-align: left; }
+.lib-add:hover { background: var(--hover); color: var(--accent); }
 .clim { display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 1px 6px; padding: 0 4px; }
 .clim .m { font: 500 10px/22px var(--mono); color: var(--muted); text-transform: uppercase; }
 .clim .ed { padding: 4px 0; font-size: var(--fs-s); border-bottom: 1px solid var(--line); }
@@ -372,7 +371,7 @@ textarea::placeholder { color: var(--faint); }
 .row:hover .plq.empty, .row:focus-within .plq.empty, .plq.empty:focus-visible { opacity: 1; }
 @media (hover: none) { .acts { opacity: 1; } .acts button:not(.act-scene) { display: none; } .plq.empty, .grip, .dots { opacity: .6; } .lib-row .ib.hov { visibility: visible; } }
 html { touch-action: manipulation; }
-@media (hover: none) { .details-name, textarea.notes-ta, .search input, .lib-add input { font-size: 16px; } }
+@media (hover: none) { .details-name, textarea.notes-ta, .search input { font-size: 16px; } }
 .av { display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; background: var(--c); color: #fff; font: 600 8.5px/1 var(--ui); letter-spacing: .02em; flex: none; text-shadow: 0 0 2px rgba(0,0,0,.25); }
 .stack { display: inline-flex; }
 .stack .av { box-shadow: 0 0 0 1.5px var(--bg); }
@@ -479,8 +478,8 @@ html { touch-action: manipulation; }
 .msep { height: 1px; background: var(--line); margin: 3px 2px; }
 .toast { position: fixed; z-index: 60; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); display: flex; align-items: center; gap: 10px; padding: 7px 8px 7px 12px; border-radius: 6px; background: var(--fg); color: var(--bg); box-shadow: var(--shadow); max-width: calc(100vw - 32px); }
 .toast button { color: var(--bg); font-weight: 600; text-decoration: underline; text-underline-offset: 2px; padding: 0 4px; }
-.scrim { position: fixed; inset: 0; z-index: 40; background: rgba(10, 14, 22, .35); display: grid; place-items: center; padding: 16px; }
-.modal { background: var(--panel); border: 1px solid var(--line-strong); border-radius: 8px; box-shadow: var(--shadow); width: min(560px, 100%); max-height: calc(100dvh - 32px); display: flex; flex-direction: column; gap: 8px; padding: 12px; }
+.scrim { position: fixed; inset: 0; z-index: 40; background: rgba(10, 14, 22, .35); display: grid; place-items: center; padding: 16px;  grid-template-columns: minmax(0, 1fr); justify-items: center;}
+.modal { background: var(--panel); border: 1px solid var(--line-strong); border-radius: 8px; box-shadow: var(--shadow); width: min(560px, 100%); max-height: calc(100dvh - 32px); display: flex; flex-direction: column; gap: 8px; padding: 12px;  max-width: 100%; min-width: 0;}
 .modal h2 { margin: 0; font: 600 15px/1.2 var(--book); }
 .modal p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.45; }
 .modal textarea { width: 100%; height: 220px; resize: vertical; font: 400 11px/1.4 var(--mono); border: 1px solid var(--line); border-radius: 4px; background: var(--bg); padding: 6px; }
@@ -1413,14 +1412,11 @@ function libGroup(key, label, lib, type, usage, ph) {
       h('button', { class: 'ib hov', title: on ? 'Clear filter' : 'Highlight scenes with ' + (x.name || 'this'), 'aria-label': 'Filter',
         onclick: () => { filter = on ? null : { type, id: x.id }; renderAll(); } }, icon('filter'))));
   }
-  const inp = h('input', { placeholder: ph, 'aria-label': ph,
-    onkeydown: (e) => {
-      if (e.key !== 'Enter' || !inp.value.trim()) return;
-      snapshot(); const x = createLib(type, inp.value.trim()); save(); renderAll();
-      // Open the new profile so its fields can be filled in straight away.
-      openDetails(x, type, 0);
-    } });
-  g.append(h('label', { class: 'lib-add' }, icon('plus'), inp));
+  // Adding opens a blank profile with the name ready to type; closing it unnamed and empty discards it.
+  g.append(h('button', { class: 'lib-add', onclick: () => {
+    snapshot(); const x = createLib(type, ''); save(); renderAll();
+    openDetails(x, type, 0, { isNew: true });
+  } }, icon('plus'), ph.replace('…', '')));
   return g;
 }
 // A small almond eye whose iris takes the character's eye colour; an unset colour draws an empty iris.
@@ -1433,18 +1429,22 @@ function eyeIcon(color, cls = '') {
   </svg>`;
   return t.content.firstChild;
 }
-function openDetails(x, type, count) {
+function openDetails(x, type, count, opts = {}) {
   closePop();
   const what = type === 'place' ? 'place' : type === 'thread' ? 'plot thread' : 'character';
   const fields = fieldsFor(type);
   const filled = () => fields.some((f) => (x[f.k] || '').trim()) || !!x.eyeColor;
   let editing = !filled();
-  const close = () => { scrim.remove(); renderRail(); renderTree(); };
+  const close = () => {
+    scrim.remove();
+    if (opts.isNew && !x.name.trim() && !filled()) { const lib = libFor(type); if (lib.includes(x)) lib.splice(lib.indexOf(x), 1); save(); }
+    renderRail(); renderTree();
+  };
   const badge = h('span', { class: type === 'place' ? 'swatch sq' : type === 'thread' ? 'swatch thr' : 'av', style: `--c:${x.color}` }, type === 'char' ? initials(x.name) : null);
   const colour = h('label', { class: 'colour-pick', title: 'Change colour' }, badge,
     h('input', { type: 'color', value: x.color, 'aria-label': 'Colour',
       oninput: (e) => { x.color = e.target.value; badge.style.setProperty('--c', x.color); save(); } }));
-  const name = h('input', { id: 'details-name', class: 'details-name', value: x.name, placeholder: `Name this ${what}`, 'aria-label': 'Name', spellcheck: 'false',
+  const name = h('input', { id: 'details-name', class: 'details-name', value: x.name, placeholder: 'Name', 'aria-label': 'Name', spellcheck: 'false',
     oninput: () => { x.name = name.value; if (type === 'char') badge.textContent = initials(x.name); save(); } });
   const body = h('div', { class: 'profile' });
   const modeBtn = h('button', { class: 'btn', onclick: () => { editing = !editing; draw(); } });
@@ -1527,7 +1527,8 @@ function openDetails(x, type, count) {
   scrim.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.stopPropagation(); close(); } });
   document.body.append(scrim);
   draw();
-  if (editing && !TOUCH) (x.name ? body.querySelector('input, textarea') : name)?.focus();
+  if (opts.isNew) name.focus();
+  else if (editing && !TOUCH) (x.name ? body.querySelector('input, textarea') : name)?.focus();
 }
 function climateGroup() {
   const g = h('div', { class: 'grp' + (S.ui.lib.climate ? ' open' : '') }, groupHead('climate', 'Climate by month'));
@@ -2119,7 +2120,7 @@ if (/iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'Mac
 }
 
 // When a newer version of the app is published, offer to reload instead of running a stale saved copy.
-const APP_VERSION = '2026-10-31.1';
+const APP_VERSION = '2026-10-31.2';
 async function checkForUpdate() {
   if (!/github\.io$/.test(location.hostname)) return;
   try {
