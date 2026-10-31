@@ -465,6 +465,9 @@ html { touch-action: manipulation; }
 .pk-list { max-height: 260px; overflow-y: auto; display: flex; flex-direction: column; }
 .pk-item, .mi { display: flex; align-items: center; gap: 6px; width: 100%; min-height: 24px; padding: 2px 6px; border-radius: 4px; text-align: left; }
 .pk-item:hover, .mi:hover, .pk-item.kb { background: var(--hover); }
+@media (hover: none) { .pk-item.kb:not(:hover) { background: none; } }
+.pk-row.just { animation: justadded 1.6s ease-out; }
+@keyframes justadded { from { background: color-mix(in srgb, var(--ok) 25%, transparent); } to { background: transparent; } }
 .pk-item .chk { width: 12px; color: var(--accent); flex: none; display: grid; place-items: center; }
 .pk-item.add { color: var(--accent); }
 .pk-item .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1413,8 +1416,9 @@ function libGroup(key, label, lib, type, usage, ph) {
   const inp = h('input', { placeholder: ph, 'aria-label': ph,
     onkeydown: (e) => {
       if (e.key !== 'Enter' || !inp.value.trim()) return;
-      snapshot(); createLib(type, inp.value.trim()); save(); renderAll();
-      setTimeout(() => $(`#rail .grp[data-key="${key}"] .lib-add input`)?.focus());
+      snapshot(); const x = createLib(type, inp.value.trim()); save(); renderAll();
+      // Open the new profile so its fields can be filled in straight away.
+      openDetails(x, type, 0);
     } });
   g.append(h('label', { class: 'lib-add' }, icon('plus'), inp));
   return g;
@@ -1592,28 +1596,31 @@ function openPicker(anchor, kind, scene) {
   const list = h('div', { class: 'pk-list', role: 'listbox' });
   const choose = (x) => {
     snapshot();
+    let added = false;
     if (multi) {
-      scene[kind] = isSel(x) ? scene[kind].filter((c) => c !== x.id) : [...scene[kind], x.id];
+      added = !isSel(x);
+      scene[kind] = added ? [...scene[kind], x.id] : scene[kind].filter((c) => c !== x.id);
     } else {
       scene[kind] = x && scene[kind] !== x.id ? x.id : null;
       if (kind === 'pov' && scene.pov && !scene.chars.includes(scene.pov)) scene.chars.unshift(scene.pov);
     }
     save(); renderTree(); renderRail();
-    if (multi) { draw(); if (!TOUCH) input.focus(); } else closePop();
+    if (multi && added) { adding = false; input.value = ''; justAdded = x.id; draw(); }
+    else if (multi) { draw(); if (!TOUCH) input.focus(); } else closePop();
   };
   const create = () => {
     const name = input.value.trim(); if (!name) return;
     const x = createLib(kind === 'place' ? 'place' : kind === 'threads' ? 'thread' : 'char', name);
     input.value = '';
     choose(x);
-    // The keyboard is already up after typing a name, so keep it there for the next one.
-    if (multi) input.focus();
+
   };
   let visible = [], hi = 0;
   // Cast and threads open on who/what is already in the scene; the full list is one tap away.
   // POV and place open on the current choice too, with Change to see the full list.
   const chosen = () => (multi ? scene[kind] : scene[kind] ? [scene[kind]] : []);
   let adding = !chosen().length;
+  let justAdded = null;   // briefly highlighted in the scene's list after being added
   const startAdding = () => { adding = true; input.hidden = false; hi = 0; draw(); if (!TOUCH) input.focus(); };
   const libType = kind === 'threads' ? 'thread' : kind === 'place' ? 'place' : 'char';
   const sceneCount = (id) => { let k = 0; walk(S.items, (n) => { if (n.type === 'scene' && (n.chars.includes(id) || n.threads.includes(id) || n.pov === id || n.place === id)) k++; }); return k; };
@@ -1628,7 +1635,7 @@ function openPicker(anchor, kind, scene) {
       const here = chosen().map((id) => lib.find((x) => x.id === id)).filter(Boolean);
       setKids(list,
         h('div', { class: 'pk-head' }, multi ? `${kind === 'threads' ? 'Plot threads' : 'In this scene'} · ${here.length}` : kind === 'pov' ? 'Point of view' : 'Place'),
-        here.map((x) => h('div', { class: 'pk-row' },
+        here.map((x) => h('div', { class: 'pk-row' + (x.id === justAdded ? ' just' : '') },
           badge(x),
           h('button', { class: 'pk-name', title: `Open ${x.name || 'details'}`, onclick: () => openDetails(x, libType, sceneCount(x.id)) }, x.name || '(unnamed)'),
           kind === 'chars' && scene.pov === x.id ? h('span', { class: 'pk-tag', title: 'Point of view' }, 'POV') : null,
@@ -2112,7 +2119,7 @@ if (/iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'Mac
 }
 
 // When a newer version of the app is published, offer to reload instead of running a stale saved copy.
-const APP_VERSION = '2026-10-30.4';
+const APP_VERSION = '2026-10-31.1';
 async function checkForUpdate() {
   if (!/github\.io$/.test(location.hostname)) return;
   try {
