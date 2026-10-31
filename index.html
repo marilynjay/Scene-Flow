@@ -404,7 +404,11 @@ html { touch-action: manipulation; }
 .time .sep { color: color-mix(in srgb, var(--time) 50%, transparent); }
 .time.dim { opacity: .45; }
 .time.slim > .row { background: none; border: 0; min-height: 18px; margin: 0; padding: 0 4px 0 6px; gap: 5px; color: color-mix(in srgb, var(--time) 75%, var(--muted)); font-size: var(--fs-s); }
-.time.slim > .row::after { content: ""; flex: 1; border-top: 1px dashed color-mix(in srgb, var(--time) 30%, transparent); margin-left: 4px; }
+.time.slim > .row { cursor: pointer; border-radius: 3px; }
+.time.slim > .row:hover { background: color-mix(in srgb, var(--time) 8%, transparent); }
+.time.slim .rule { flex: 1; min-width: 12px; border-top: 1px dashed color-mix(in srgb, var(--time) 30%, transparent); margin-left: 4px; }
+.time.slim .tt { font: 500 10.5px var(--mono); color: color-mix(in srgb, var(--time) 80%, var(--fg)); white-space: nowrap; flex: none; font-variant-numeric: tabular-nums; }
+.time.slim .dots { margin-left: -2px; }
 .time.slim svg.i { width: 11px; height: 11px; }
 .time.slim .tl { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .time.slim .tm { font: 400 10px var(--mono); opacity: .8; }
@@ -1006,7 +1010,7 @@ function renderList(list, into, depth, nums, show = 2) {
     if (hiding() && ((n.type === 'scene' && !sceneMatches(n)) || (n.type === 'section' && !sectionMatches(n)))) continue;
     if (n.type === 'section') into.append(renderSection(n, depth, nums));
     else if (n.type === 'scene') into.append(renderScene(n, nums.get(n.id)));
-    else if (n.type === 'time') into.append(renderTime(n, show < 2));
+    else if (n.type === 'time') into.append(renderTime(n));
   }
 }
 
@@ -1406,23 +1410,40 @@ function plaques(n) {
       h('span', { class: 't' }, pov ? firstName(pov.name) : 'POV')));
 }
 
-function renderTime(n, slim) {
+// Time markers are a slim divider by default; tapping one opens it for editing, and its arrow folds it again.
+const openTimes = new Set();
+// The temperature range from a marker's weather (its own, or the month's typical weather), e.g. "56–77°F".
+function tempSpread(n) {
+  if (!n.month) return '';
+  const w = n.weather || S.climate[n.month - 1] || '';
+  const m = w.match(/-?\d+\s*(?:°\s*[FC]?)?\s*[–—-]\s*-?\d+\s*°\s*[FC]?|-?\d+\s*°\s*[FC]/i);
+  return m ? m[0].replace(/\s+/g, '') : '';
+}
+function renderTime(n) {
   const clim = n.month ? S.climate[n.month - 1] : '';
-  // Where scenes are hidden a time marker is a slim divider; it's edited once its section is open.
-  if (slim) return h('div', { class: 'node time slim', 'data-id': n.id, title: [n.label, n.month ? MONTHS[n.month - 1] : '', n.weather || clim].filter(Boolean).join(' · ') },
-    h('div', { class: 'row' }, icon('clock'), h('span', { class: 'tl' }, n.label || 'Time passes'), n.month ? h('span', { class: 'tm' }, MONTHS[n.month - 1]) : null));
+  const dim = filtering() && !hiding() ? ' dim' : '';
+  if (!openTimes.has(n.id)) {
+    const open = () => { openTimes.add(n.id); renderTree(); };
+    const temp = tempSpread(n);
+    return h('div', { class: 'node time slim' + dim, 'data-id': n.id },
+      h('div', { class: 'row', role: 'button', tabindex: '0', title: [n.label, n.month ? MONTHS[n.month - 1] : '', n.weather || clim].filter(Boolean).join(' · ') + '  (tap to edit)',
+        onclick: (e) => { if (!e.target.closest('.dots, .grip')) open(); }, onkeydown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } } },
+        grip(), icon('clock'), h('span', { class: 'tl' }, n.label || 'Time passes'), n.month ? h('span', { class: 'tm' }, MONTHS[n.month - 1]) : null,
+        h('span', { class: 'rule' }), temp ? h('span', { class: 'tt' }, temp) : null, dotsBtn(n)));
+  }
   const sel = h('select', { title: 'Month (fills in typical weather from your climate table)', 'aria-label': 'Month',
     onchange: (e) => { n.month = +e.target.value; save(); renderTree(); } },
     h('option', { value: 0 }, '—'), MONTHS.map((m, i) => h('option', { value: i + 1, selected: n.month === i + 1 }, m)));
   const row = h('div', { class: 'row' },
     grip(),
-    h('span', { class: 'caret-b', style: 'color:inherit;cursor:default' }, icon('clock')),
+    h('button', { class: 'caret-b open', style: 'color:inherit', title: 'Fold back to one line', 'aria-label': 'Fold time marker', onclick: () => { openTimes.delete(n.id); renderTree(); } }, icon('right')),
+    icon('clock'),
     editable('tlabel', n.label, 'When? e.g. “1 month into classes”', (v) => { n.label = v; }),
     sel,
     h('span', { class: 'sep' }, icon('cloud')),
     editable('weather' + (clim ? ' auto' : ''), n.weather, clim ? clim : (n.month ? 'Typical weather… (add it in Climate)' : 'Weather…'), (v) => { n.weather = v; }),
     dotsBtn(n));
-  return h('div', { class: 'node time' + (filtering() && !hiding() ? ' dim' : ''), 'data-id': n.id }, row);
+  return h('div', { class: 'node time' + dim, 'data-id': n.id }, row);
 }
 
 /* ================= toolbar ================= */
@@ -1911,7 +1932,7 @@ function moveTo(n, destId) {
   reveal(n.id);
   toast(destId === 'holding' ? `Moved “${n.title || 'scene'}” to holding` : `Moved to ${dest ? `“${dest.node.title || 'Untitled section'}”` : 'the top level'}`, 'Undo', undo);
 }
-function newOf(type) { return type === 'scene' ? blankScene() : type === 'time' ? blankTime() : blankSection(); }
+function newOf(type) { if (type === 'time') { const t = blankTime(); openTimes.add(t.id); return t; } return type === 'scene' ? blankScene() : blankSection(); }
 function focusNew(id) {
   setTimeout(() => {
     const el = $(`[data-id="${id}"] .ed`);
@@ -2311,7 +2332,7 @@ if (/iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'Mac
 }
 
 // When a newer version of the app is published, offer to reload instead of running a stale saved copy.
-const APP_VERSION = '2026-10-31.7';
+const APP_VERSION = '2026-10-31.8';
 async function checkForUpdate() {
   if (!/github\.io$/.test(location.hostname)) return;
   try {
