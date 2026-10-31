@@ -462,7 +462,9 @@ html { touch-action: manipulation; }
 .sheet .pk-item .av { width: 22px; height: 22px; font-size: 10px; }
 .sheet .mi .k { font-size: 12px; }
 .sheet .msep { flex: none; }
-.sheet-done { flex: none; height: 40px; font-size: 15px; margin-top: 4px; }
+.sheet-done { flex: none; height: 40px; font-size: 15px; margin-top: 4px; position: sticky; bottom: 0; box-shadow: 0 -8px 12px var(--panel); }
+.pop.sheet { overflow-y: auto; overscroll-behavior: contain; }
+.pop.sheet.menu .mi { flex: none; }
 .pk-search { width: 100%; height: 24px; border: 1px solid var(--line); border-radius: 4px; padding: 0 6px; background: var(--bg); outline: 0; margin-bottom: 3px; }
 .pk-search:focus { border-color: var(--accent); }
 .pk-list { max-height: 260px; overflow-y: auto; display: flex; flex-direction: column; }
@@ -525,6 +527,14 @@ html { touch-action: manipulation; }
   .body { padding-left: 10px; }
   .kids { margin-left: 4px; padding-left: 6px; }
 }
+/* Phones: no drag handles (dragging needs a mouse), and scene rows drop the status dot and number to give titles room. */
+@media (hover: none) { .grip { display: none !important; } }
+@media (max-width: 760px) { .scene > .row .st, .scene > .row .num { display: none; } .scene > .row { gap: 4px; } }
+.mi-status { display: flex; align-items: center; gap: 4px; padding: 3px 6px; flex-wrap: wrap; }
+.mi-status .k { color: var(--faint); font-size: 10px; text-transform: uppercase; letter-spacing: .06em; margin-right: 2px; }
+.mi-status button { display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 7px; border-radius: 12px; border: 1px solid var(--line); font-size: var(--fs-s); color: var(--muted); }
+.mi-status button.on { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+.sheet .mi-status button { height: 34px; font-size: 14px; padding: 0 10px; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 
@@ -1745,6 +1755,10 @@ function openMenu(anchor, n) {
   } else {
     items.push(mi('Add scene below', () => addAfter(n, 'scene')), mi('Add time marker below', () => addAfter(n, 'time')));
     if (n.type === 'scene') items.push(
+      h('div', { class: 'mi-status', role: 'group', 'aria-label': 'Status' }, h('span', { class: 'k' }, 'Status'),
+        STATUS.map((label, i) => h('button', { class: (n.status || 0) === i ? 'on' : '', 'aria-pressed': String((n.status || 0) === i),
+          onclick: () => { n.status = i; save(); renderTree(); closePop(); } }, h('span', { class: 'st', 'data-s': i }), label))),
+      h('div', { class: 'msep' }),
       mi('Add to-do or question', () => { n.open = Math.max(n.open || 0, 1); askingIn.add(n.id); save(); renderTree(); focusQuestion(n.id); }),
       h('button', { class: 'mi', onclick: () => openSceneTasks(anchor, n) }, 'Tag with a change across scenes…', h('span', { class: 'k' }, '▸')));
   }
@@ -2203,7 +2217,7 @@ if (/iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'Mac
 }
 
 // When a newer version of the app is published, offer to reload instead of running a stale saved copy.
-const APP_VERSION = '2026-10-31.4';
+const APP_VERSION = '2026-10-31.5';
 async function checkForUpdate() {
   if (!/github\.io$/.test(location.hostname)) return;
   try {
