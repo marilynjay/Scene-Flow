@@ -363,6 +363,16 @@ textarea::placeholder { color: var(--faint); }
 .se-field > h3 { margin: 0; font: 600 10.5px/1.2 var(--ui); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
 .se-field .mi-status { padding: 0; }
 .se-heat { display: flex; flex-wrap: wrap; gap: 4px; }
+.se-props { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.se-prop { display: flex; align-items: center; gap: 6px; min-width: 0; height: 32px; padding: 0 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); text-align: left; }
+.se-prop:hover { border-color: var(--line-strong); }
+.se-prop .k { flex: none; font: 600 9.5px/1 var(--ui); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); width: 5.6em; }
+.se-prop .v { flex: 1; min-width: 0; display: inline-flex; align-items: center; gap: 5px; overflow: hidden; white-space: nowrap; font-size: 13px; color: var(--fg); }
+.se-prop .v .unset { color: var(--faint); }
+.se-prop .chev { flex: none; color: var(--faint); font-size: 10px; }
+.se-prop .av { width: 18px; height: 18px; font-size: 8px; }
+.se-prop .hsw { width: 10px; height: 10px; flex: none; }
+@media (max-width: 420px) { .se-prop .k { width: auto; } }
 .heat-b { display: inline-flex; align-items: center; gap: 5px; height: 28px; padding: 0 9px; border-radius: 14px; border: 1px solid var(--line); font-size: 12px; color: var(--muted); }
 .heat-b .hsw { width: 10px; height: 10px; }
 .heat-b.on { border-color: var(--hc, var(--accent)); color: var(--fg); background: color-mix(in srgb, var(--hc, var(--accent)) 16%, var(--panel)); font-weight: 600; }
@@ -2069,7 +2079,7 @@ function chooser(o) {
     setKids(sel, chosen.length ? chosen.map((x) => h('span', { class: 'ch-chip', style: `--c:${x.color}` }, badge(x), h('span', { class: 'nm' }, x.name || '(unnamed)'),
       h('button', { class: 'ch-x', 'aria-label': `Remove ${x.name}`, onclick: () => { o.toggle(x); draw(); } }, icon('x')))) : h('span', { class: 'ch-none' }, o.none));
   };
-  const drawQuick = () => { const qs = o.quick ? o.quick().filter((x) => !isSel(x)) : []; setKids(quick, qs.map((x) => h('button', { class: 'ch-q', onclick: () => pick(x) }, badge(x), x.short || firstName(x.name)))); };
+  const drawQuick = () => { const qs = o.quick ? o.quick().filter((x) => !isSel(x)) : []; setKids(quick, qs.map((x) => h('button', { class: 'ch-q', onclick: () => pick(x) }, badge(x), o.kind === 'thread' ? x.name : x.short || firstName(x.name)))); };
   const drawList = () => {
     if (!q && !o.showAll) { list.replaceChildren(); return; }
     const items = o.items().filter((x) => x.name.toLowerCase().includes(q)).sort((a, b) => (q ? rank(a) - rank(b) : 0));
@@ -2108,9 +2118,6 @@ function openSceneEditor(start, opts = {}) {
       hit && hit.parent && hit.parent !== S.holding ? h('span', { class: 'se-where' }, `in ${hit.parent.title || 'Untitled section'}`) : null);
     const title = h('input', { class: 'se-title', value: n.title, placeholder: 'Scene title', 'aria-label': 'Scene title', id: 'se-title',
       oninput: () => { n.title = title.value; save(); }, onkeydown: (e) => { if (e.key === 'Enter') { e.preventDefault(); title.blur(); } } });
-    const status = h('div', { class: 'mi-status' }, STATUS.map((label, k) => h('button', { class: (n.status || 0) === k ? 'on' : '', onclick: () => { n.status = k; save(); draw(); } }, h('span', { class: 'st', 'data-s': k }), label)));
-    const heat = h('div', { class: 'se-heat' }, [0, 1, 2, 3, 4, 5].map((v) => h('button', { class: 'heat-b' + ((n.heat || 0) === v ? ' on' : ''), style: v ? `--hc:var(--h${v})` : null, title: v ? HEAT_HINT[v] : 'Not set', onclick: () => { n.heat = v; save(); draw(); } },
-      v ? h('span', { class: 'hsw' }) : null, v ? HEAT[v] : 'Not set')));
     const charPick = (kind) => chooser({ kind: 'char', placeholder: 'Find or add a character…', none: kind === 'pov' ? 'No POV yet' : 'No one yet',
       items: () => S.characters, quick: () => S.characters.filter((c) => c.highlight),
       selected: () => kind === 'pov' ? [charById(n.pov)].filter(Boolean) : n.chars.map(charById).filter(Boolean),
@@ -2119,19 +2126,26 @@ function openSceneEditor(start, opts = {}) {
         else n.chars = n.chars.includes(x.id) ? n.chars.filter((c) => c !== x.id) : [...n.chars, x.id];
         save();
       } });
-    const placePick = chooser({ kind: 'place', placeholder: 'Find or add a place…', none: 'No place yet', items: () => S.places,
-      selected: () => [placeById(n.place)].filter(Boolean), toggle: (x) => { n.place = n.place === x.id ? null : x.id; save(); } });
     const cast = charPick('chars');
-    const pov = charPick('pov');
-    const threads = chooser({ kind: 'thread', placeholder: 'Find or add a plot thread…', none: 'No threads', items: () => S.threads, showAll: true,
+    const threads = chooser({ kind: 'thread', placeholder: 'Find or add a plot thread…', none: 'No threads', items: () => S.threads, quick: () => S.threads,
       selected: () => n.threads.map(threadById).filter(Boolean), toggle: (x) => { n.threads = n.threads.includes(x.id) ? n.threads.filter((t) => t !== x.id) : [...n.threads, x.id]; save(); } });
     const area2 = (cls, key, ph) => { const t = h('textarea', { class: 'pf-ta ' + cls, placeholder: ph, rows: 3 }); t.value = n[key] || ''; t.addEventListener('input', () => { n[key] = t.value; grow(t); save(); }); return t; };
+    // Single-choice properties: a compact button each, opening its options in a popup.
+    const pov1 = charById(n.pov), pl1 = placeById(n.place), sv = n.status || 0, hv = n.heat || 0;
+    const prop = (label, value, onclick) => h('button', { class: 'se-prop', onclick }, h('span', { class: 'k' }, label), h('span', { class: 'v' }, value), h('span', { class: 'chev' }, '▾'));
+    const props = h('div', { class: 'se-props' },
+      prop('Status', [h('span', { class: 'st', 'data-s': sv }), STATUS[sv]], (e) => {
+        closePop();
+        pop = h('div', { class: 'pop menu' }, h('div', { class: 'pk-head' }, 'Status'), STATUS.map((label, k) => h('button', { class: 'mi', onclick: () => { n.status = k; save(); closePop(); } },
+          h('span', { class: 'st', 'data-s': k }), label, sv === k ? h('span', { class: 'k' }, icon('check')) : null)));
+        place(pop, e.currentTarget); popClosed = redrawKeepScroll;
+      }),
+      prop('Intensity', hv ? [h('span', { class: 'hsw', style: `--hc:var(--h${hv})` }), HEAT[hv]] : h('span', { class: 'unset' }, 'Not set'), (e) => { openHeat(e.currentTarget, n); popClosed = redrawKeepScroll; }),
+      prop('Place', pl1 ? [h('span', { class: 'swatch sq', style: `--c:${pl1.color}` }), pl1.name] : h('span', { class: 'unset' }, 'Not set'), (e) => { openPicker(e.currentTarget, 'place', n); popClosed = redrawKeepScroll; }),
+      prop('POV', pov1 ? [h('span', { class: 'av', style: `--c:${pov1.color}` }, initials(pov1.name)), tagName(pov1)] : h('span', { class: 'unset' }, 'Not set'), (e) => { openPicker(e.currentTarget, 'pov', n); popClosed = redrawKeepScroll; }));
     setKids(body,
       title,
-      field('Status', status),
-      field('Intensity', heat),
-      field('Place', placePick),
-      field('POV', pov),
+      props,
       field('Cast', cast),
       field('Plot threads', threads),
       field('Description', area2('se-sum', 'summary', 'Short description of this scene…')),
@@ -2559,7 +2573,7 @@ if (/iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'Mac
 }
 
 // When a newer version of the app is published, offer to reload instead of running a stale saved copy.
-const APP_VERSION = '2026-10-31.16';
+const APP_VERSION = '2026-10-31.17';
 async function checkForUpdate() {
   if (!/github\.io$/.test(location.hostname)) return;
   try {
