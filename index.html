@@ -349,6 +349,44 @@ textarea::placeholder { color: var(--faint); }
   font: 600 9.5px/1.4 var(--ui); text-transform: uppercase; letter-spacing: .07em;
   color: color-mix(in srgb, var(--c) 70%, var(--fg)); background: color-mix(in srgb, var(--c) 13%, transparent); border: 1px solid color-mix(in srgb, var(--c) 28%, transparent); }
 .ptag:hover { background: color-mix(in srgb, var(--c) 22%, transparent); }
+.title.tbtn { text-align: left; color: inherit; font: inherit; font-weight: 500; padding: 1px 3px; min-width: 6ch; overflow-wrap: anywhere; }
+.title.tbtn:empty::before { content: attr(data-ph); color: var(--faint); }
+.modal.se { width: min(680px, 100%); }
+.se-head { display: flex; align-items: baseline; gap: 8px; min-width: 0; flex-wrap: wrap; }
+.se-num { font: 600 14px/1.2 var(--book); }
+.se-where { color: var(--muted); font-size: var(--fs-s); }
+.se-body { gap: 12px; }
+.se-title { width: 100%; font: 600 17px/1.3 var(--book); border: 1px solid var(--line); border-radius: 6px; background: var(--bg); padding: 7px 9px; outline: 0; color: var(--fg); }
+.se-title:focus { border-color: var(--accent); background: var(--panel); }
+.se-field { display: flex; flex-direction: column; gap: 5px; }
+.se-field > h3 { margin: 0; font: 600 10.5px/1.2 var(--ui); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+.se-field .mi-status { padding: 0; }
+.se-heat { display: flex; flex-wrap: wrap; gap: 4px; }
+.heat-b { display: inline-flex; align-items: center; gap: 5px; height: 28px; padding: 0 9px; border-radius: 14px; border: 1px solid var(--line); font-size: 12px; color: var(--muted); }
+.heat-b .hsw { width: 10px; height: 10px; }
+.heat-b.on { border-color: var(--hc, var(--accent)); color: var(--fg); background: color-mix(in srgb, var(--hc, var(--accent)) 16%, var(--panel)); font-weight: 600; }
+.ch { display: flex; flex-direction: column; gap: 5px; }
+.ch-sel, .ch-quick { display: flex; flex-wrap: wrap; gap: 4px; }
+.ch-quick:empty { display: none; }
+.ch-chip { display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 3px 0 5px; border-radius: 13px; border: 1px solid color-mix(in srgb, var(--c) 45%, var(--line)); background: color-mix(in srgb, var(--c) 12%, var(--panel)); font-size: 12.5px; }
+.ch-chip .av { width: 18px; height: 18px; font-size: 8px; }
+.ch-x { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; color: var(--muted); }
+.ch-x:hover { background: var(--line); color: var(--fg); }
+.ch-none { color: var(--faint); font-size: 12.5px; padding: 3px 0; }
+.ch-q { display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 8px 0 4px; border-radius: 12px; border: 1px dashed var(--line-strong); color: var(--muted); font-size: 12px; }
+.ch-q:hover { color: var(--fg); border-style: solid; }
+.ch-q .av { width: 16px; height: 16px; font-size: 7.5px; }
+.ch-search { height: 30px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); padding: 0 9px; outline: 0; color: var(--fg); font-size: 13px; }
+.ch-search:focus { border-color: var(--accent); }
+.ch-list { display: flex; flex-direction: column; max-height: 210px; overflow-y: auto; border-radius: 6px; }
+.ch-list:empty { display: none; }
+.ch-item { display: flex; align-items: center; gap: 7px; min-height: 30px; padding: 2px 6px; border-radius: 4px; text-align: left; font-size: 13px; }
+.ch-item:hover { background: var(--hover); }
+.ch-item.on { color: var(--accent); font-weight: 500; }
+.ch-item.add { color: var(--accent); }
+.ch-item .chk { width: 14px; display: grid; place-items: center; }
+.se-foot { flex-wrap: wrap; }
+@media (hover: none) { .se-title, .ch-search { font-size: 16px; } .ch-item { min-height: 40px; font-size: 15px; } .ch-chip { height: 32px; font-size: 14px; } .ch-q { height: 32px; font-size: 13.5px; } .heat-b, .mi-status button { height: 34px; } }
 .smeta { display: flex; flex-wrap: wrap; gap: 4px; padding: 1px 0 2px; }
 .mchip { display: inline-flex; align-items: center; gap: 5px; max-width: 100%; min-height: 22px; padding: 1px 8px 1px 6px; border-radius: 11px; border: 1px solid var(--line); background: var(--bg); font-size: var(--fs-s); color: var(--fg); text-align: left; }
 .mchip:hover { border-color: var(--line-strong); }
@@ -1165,7 +1203,7 @@ function renderScene(n, num) {
     h('span', { class: 'num', title: num ? null : 'In holding' }, num || '–'),
     placeById(n.place) ? h('button', { class: 'ptag', style: `--c:${placeById(n.place).color}`, title: `${placeById(n.place).name} (tap to change)`,
       onclick: (e) => { e.stopPropagation(); openPicker(e.currentTarget, 'place', n); } }, placeTag(placeById(n.place))) : null,
-    highlightTitle(editable('title', n.title, 'Untitled scene', (v) => { n.title = v; }), () => n.title),
+    highlightTitle(TOUCH ? h('button', { class: 'title tbtn', 'data-ph': 'Untitled scene', onclick: () => openSceneEditor(n) }) : editable('title', n.title, 'Untitled scene', (v) => { n.title = v; }), () => n.title),
     open === 0 && n.summary ? h('span', { class: 'peek', onclick: toggle, title: n.summary }, n.summary) : h('span', { class: 'fill', onclick: toggle }),
     openCount(n) ? h('button', { class: 'qbadge', title: openItems(n).map((t) => (t.kind === 'question' ? '? ' : '• ') + t.text).join('\n'), 'aria-label': `${openCount(n)} open to-dos and questions`,
       onclick: () => { n.open = Math.max(n.open || 0, 1); save(); renderTree(); } }, icon(openItems(n).some((t) => t.kind !== 'question') ? 'pen' : 'q'), openCount(n)) : null,
@@ -1906,6 +1944,7 @@ function openMenu(anchor, n) {
     items.push(mi('Rename', () => renameSection(n)), mi(n.summary ? 'Edit description' : 'Add description', () => describeSection(n)), h('div', { class: 'msep' }), mi('Add scene inside', () => addInside(n, 'scene')), mi('Add time marker inside', () => addInside(n, 'time')), mi('Add sub-section inside', () => addInside(n, 'section')), h('div', { class: 'msep' }), mi('Add section below', () => addAfter(n, 'section')));
   } else {
     items.push(mi('Add scene below', () => addAfter(n, 'scene')), mi('Add time marker below', () => addAfter(n, 'time')));
+    if (n.type === 'scene') items.unshift(mi('Edit scene', () => openSceneEditor(n)), h('div', { class: 'msep' }));
     if (n.type === 'scene') items.push(
       h('div', { class: 'mi-status', role: 'group', 'aria-label': 'Status' }, h('span', { class: 'k' }, 'Status'),
         STATUS.map((label, i) => h('button', { class: (n.status || 0) === i ? 'on' : '', 'aria-pressed': String((n.status || 0) === i),
@@ -1982,6 +2021,7 @@ function sceneToSection(n) {
   hit.list.splice(hit.list.indexOf(n), 1, sec);
   save(); renderAll();
   toast('Turned into a section. Rename this first scene, then add more with + Scene');
+  if (TOUCH) { openSceneEditor(n, { isNew: true }); return; }
   // Select the first scene's title so it can be renamed straight away.
   const f = () => {
     const el = $(`[data-id="${n.id}"] .title`); if (!el) return;
@@ -1990,8 +2030,108 @@ function sceneToSection(n) {
   };
   f(); setTimeout(f);
 }
+/* ================= scene editor ================= */
+// A searchable chooser used for place, POV, cast and threads inside the scene editor.
+function chooser(o) {
+  let q = '';
+  const badge = (x) => o.kind === 'place' ? h('span', { class: 'swatch sq', style: `--c:${x.color}` }) : o.kind === 'thread' ? h('span', { class: 'swatch thr', style: `--c:${x.color}` }) : h('span', { class: 'av', style: `--c:${x.color}` }, initials(x.name));
+  const isSel = (x) => o.selected().includes(x);
+  const sel = h('div', { class: 'ch-sel' }), quick = h('div', { class: 'ch-quick' }), list = h('div', { class: 'ch-list' });
+  const rank = (x) => { const n = x.name.toLowerCase(); return n.startsWith(q) ? 0 : n.split(/[\s(]+/).some((w) => w.startsWith(q)) ? 1 : 2; };
+  const pick = (x) => { o.toggle(x); q = ''; input.value = ''; draw(); };
+  const create = () => { const name = input.value.trim(); if (!name) return; pick(createLib(o.kind, name)); renderRail(); };
+  const input = h('input', { class: 'ch-search', placeholder: o.placeholder, 'aria-label': o.placeholder,
+    oninput: () => { q = input.value.trim().toLowerCase(); drawList(); },
+    onkeydown: (e) => { if (e.key !== 'Enter') return; e.preventDefault(); const first = list.querySelector('button'); if (first) first.click(); } });
+  const drawSel = () => {
+    const chosen = o.selected();
+    setKids(sel, chosen.length ? chosen.map((x) => h('span', { class: 'ch-chip', style: `--c:${x.color}` }, badge(x), h('span', { class: 'nm' }, x.name || '(unnamed)'),
+      h('button', { class: 'ch-x', 'aria-label': `Remove ${x.name}`, onclick: () => { o.toggle(x); draw(); } }, icon('x')))) : h('span', { class: 'ch-none' }, o.none));
+  };
+  const drawQuick = () => { const qs = o.quick ? o.quick().filter((x) => !isSel(x)) : []; setKids(quick, qs.map((x) => h('button', { class: 'ch-q', onclick: () => pick(x) }, badge(x), x.short || firstName(x.name)))); };
+  const drawList = () => {
+    if (!q && !o.showAll) { list.replaceChildren(); return; }
+    const items = o.items().filter((x) => x.name.toLowerCase().includes(q)).sort((a, b) => (q ? rank(a) - rank(b) : 0));
+    setKids(list, items.map((x) => h('button', { class: 'ch-item' + (isSel(x) ? ' on' : ''), onclick: () => pick(x) },
+        h('span', { class: 'chk' }, isSel(x) ? icon('check') : null), badge(x), h('span', { class: 'nm' }, x.name || '(unnamed)'))),
+      q && !o.items().some((x) => x.name.toLowerCase() === q) ? h('button', { class: 'ch-item add', onclick: create }, h('span', { class: 'chk' }, icon('plus')), h('span', { class: 'nm' }, `Add “${input.value.trim()}”`)) : null);
+  };
+  const draw = () => { drawSel(); drawQuick(); drawList(); if (o.after) o.after(); };
+  draw();
+  return h('div', { class: 'ch' }, sel, quick, input, list);
+}
+function scenesInOrder() { const out = []; walk(everything(), (x) => { if (x.type === 'scene') out.push(x); }); return out; }
+function openSceneEditor(start, opts = {}) {
+  closePop(); $('.scrim')?.remove();
+  let n = start;
+  snapshot();
+  const body = h('div', { class: 'profile se-body' });
+  const head = h('div', { class: 'se-head' });
+  const prevB = h('button', { class: 'btn', 'aria-label': 'Previous scene', onclick: () => go(-1) }, '‹ Prev');
+  const nextB = h('button', { class: 'btn', 'aria-label': 'Next scene', onclick: () => go(1) }, 'Next ›');
+  const close = () => { scrim.remove(); renderAll(); reveal(n.id); };
+  const go = (d) => { const all = scenesInOrder(); const i = all.indexOf(n) + d; if (i >= 0 && i < all.length) { n = all[i]; draw(); body.scrollTop = 0; } };
+  const addNext = () => {
+    const hit = find(n.id); if (!hit) return;
+    const x = blankScene(); x.place = n.place;   // a new scene usually happens in the same place
+    hit.list.splice(hit.list.indexOf(n) + 1, 0, x);
+    n = x; save(); draw(); body.scrollTop = 0; focusTitle();
+  };
+  const redrawKeepScroll = () => { const y = body.scrollTop; draw(); body.scrollTop = y; };
+  const focusTitle = () => { const t = body.querySelector('.se-title'); if (t) { t.focus(); t.select(); } };
+  const field = (label, ...kids) => h('section', { class: 'se-field' }, h('h3', null, label), kids);
+  const draw = () => {
+    const all = scenesInOrder(), i = all.indexOf(n), nums = sceneNums(), hit = find(n.id);
+    prevB.disabled = i <= 0; nextB.disabled = i >= all.length - 1;
+    setKids(head, h('span', { class: 'se-num' }, nums.get(n.id) ? `Scene ${nums.get(n.id)}` : 'Held scene'),
+      hit && hit.parent && hit.parent !== S.holding ? h('span', { class: 'se-where' }, `in ${hit.parent.title || 'Untitled section'}`) : null);
+    const title = h('input', { class: 'se-title', value: n.title, placeholder: 'Scene title', 'aria-label': 'Scene title', id: 'se-title',
+      oninput: () => { n.title = title.value; save(); }, onkeydown: (e) => { if (e.key === 'Enter') { e.preventDefault(); title.blur(); } } });
+    const status = h('div', { class: 'mi-status' }, STATUS.map((label, k) => h('button', { class: (n.status || 0) === k ? 'on' : '', onclick: () => { n.status = k; save(); draw(); } }, h('span', { class: 'st', 'data-s': k }), label)));
+    const heat = h('div', { class: 'se-heat' }, [0, 1, 2, 3, 4, 5].map((v) => h('button', { class: 'heat-b' + ((n.heat || 0) === v ? ' on' : ''), style: v ? `--hc:var(--h${v})` : null, title: v ? HEAT_HINT[v] : 'Not set', onclick: () => { n.heat = v; save(); draw(); } },
+      v ? h('span', { class: 'hsw' }) : null, v ? HEAT[v] : 'Not set')));
+    const charPick = (kind) => chooser({ kind: 'char', placeholder: 'Find or add a character…', none: kind === 'pov' ? 'No POV yet' : 'No one yet',
+      items: () => S.characters, quick: () => S.characters.filter((c) => c.highlight),
+      selected: () => kind === 'pov' ? [charById(n.pov)].filter(Boolean) : n.chars.map(charById).filter(Boolean),
+      toggle: (x) => {
+        if (kind === 'pov') { n.pov = n.pov === x.id ? null : x.id; if (n.pov && !n.chars.includes(n.pov)) n.chars.unshift(n.pov); setTimeout(redrawKeepScroll); }
+        else n.chars = n.chars.includes(x.id) ? n.chars.filter((c) => c !== x.id) : [...n.chars, x.id];
+        save();
+      } });
+    const placePick = chooser({ kind: 'place', placeholder: 'Find or add a place…', none: 'No place yet', items: () => S.places,
+      selected: () => [placeById(n.place)].filter(Boolean), toggle: (x) => { n.place = n.place === x.id ? null : x.id; save(); } });
+    const cast = charPick('chars');
+    const pov = charPick('pov');
+    const threads = chooser({ kind: 'thread', placeholder: 'Find or add a plot thread…', none: 'No threads', items: () => S.threads, showAll: true,
+      selected: () => n.threads.map(threadById).filter(Boolean), toggle: (x) => { n.threads = n.threads.includes(x.id) ? n.threads.filter((t) => t !== x.id) : [...n.threads, x.id]; save(); } });
+    const area2 = (cls, key, ph) => { const t = h('textarea', { class: 'pf-ta ' + cls, placeholder: ph, rows: 3 }); t.value = n[key] || ''; t.addEventListener('input', () => { n[key] = t.value; grow(t); save(); }); return t; };
+    setKids(body,
+      title,
+      field('Status', status),
+      field('Intensity', heat),
+      field('Place', placePick),
+      field('POV', pov),
+      field('Cast', cast),
+      field('Plot threads', threads),
+      field('Description', area2('se-sum', 'summary', 'Short description of this scene…')),
+      field('Details', area2('se-det', 'details', 'Beats, dialogue fragments, research, things to remember…')),
+      field('To-dos & questions', todoList(n.todos, 'ed-' + n.id, draw, { noHead: true })));
+    body.querySelectorAll('textarea').forEach(grow);
+  };
+  const scrim = h('div', { class: 'scrim', onclick: (e) => { if (e.target === scrim) close(); } },
+    h('div', { class: 'modal notes se', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Edit scene' },
+      h('div', { class: 'notes-head' }, h('span', { class: 'qicon' }, icon('pen')), head, h('span', { class: 'spacer' }), h('button', { class: 'btn primary', onclick: close }, 'Done')),
+      body,
+      h('div', { class: 'btns se-foot' }, prevB, nextB, h('span', { class: 'spacer' }), h('button', { class: 'btn', onclick: addNext }, '+ New scene after'))));
+  scrim.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !pop) { e.stopPropagation(); close(); } });
+  document.body.append(scrim);
+  draw();
+  if (opts.isNew || !TOUCH) focusTitle();
+}
 function newOf(type) { if (type === 'time') { const t = blankTime(); openTimes.add(t.id); return t; } return type === 'scene' ? blankScene() : blankSection(); }
 function focusNew(id) {
+  const hit = find(id);
+  if (TOUCH && hit && hit.node.type === 'scene') { openSceneEditor(hit.node, { isNew: true }); return; }
   setTimeout(() => {
     const el = $(`[data-id="${id}"] .ed`);
     if (el) { el.focus(); el.scrollIntoView({ block: 'nearest' }); }
@@ -2390,7 +2530,7 @@ if (/iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'Mac
 }
 
 // When a newer version of the app is published, offer to reload instead of running a stale saved copy.
-const APP_VERSION = '2026-10-31.13';
+const APP_VERSION = '2026-10-31.14';
 async function checkForUpdate() {
   if (!/github\.io$/.test(location.hostname)) return;
   try {
