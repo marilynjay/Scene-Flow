@@ -2011,7 +2011,9 @@ function openMenu(anchor, n) {
     h('div', { class: 'msep' }),
     h('div', { class: 'mi-label' }, 'Add inside'),
     pair(['+ Scene', () => addInside(n, 'scene')], ['+ Time', () => addInside(n, 'time')], ['+ Sub-section', () => addInside(n, 'section')]),
-    mi('Add section below', () => addAfter(n, 'section')));
+    mi('Add section below', () => addAfter(n, 'section')),
+    h('div', { class: 'msep' }),
+    mi('Share with AI…', () => openAiExport(n)));
   else items.push(
     h('div', { class: 'msep' }),
     pair(['+ Scene below', () => addAfter(n, 'scene')], ['+ Time below', () => addAfter(n, 'time')]));
@@ -2479,8 +2481,9 @@ function openBackup() {
 /* ================= share with AI ================= */
 function outlineMarkdown(opt) {
   const names = (ids) => ids.map(charById).filter(Boolean).map((c) => c.name || '(unnamed)').join(', ');
+  const root = opt.root || null;
   const usage = new Map(), povs = new Map();
-  walk(S.items, (n) => {
+  walk(root ? root.children : S.items, (n) => {
     if (n.type !== 'scene') return;
     new Set([...n.chars, ...n.threads, n.pov, n.place].filter(Boolean)).forEach((id) => usage.set(id, (usage.get(id) || 0) + 1));
     if (n.pov) povs.set(n.pov, (povs.get(n.pov) || 0) + 1);
@@ -2494,11 +2497,32 @@ function outlineMarkdown(opt) {
   };
   const indent = (t, pad) => t.trim().split('\n').map((l) => pad + l).join('\n');
   const out = [];
+  const nums = sceneNums();
+  if (root) {
+    // Where the section sits, and the last time marker before it, so the AI knows when and where it is.
+    const path = []; let r = find(root.id);
+    while (r && r.parent) { path.unshift(r.parent.title || 'Untitled section'); r = find(r.parent.id); }
+    let lastTime = null, done = false;
+    walk(everything(), (n) => { if (done) return; if (n === root) { done = true; return; } if (n.type === 'time') lastTime = n; });
+    const inHolding = !walk_has(S.items, root);
+    out.push(`# ${S.title || 'Untitled novel'}: “${root.title || 'Untitled section'}”`, '');
+    out.push('_One section of the working scene outline for my novel, exported from Scene Flow. Scene numbers are from the full book. “Time” lines mark time passing between scenes. Intensity runs 1 (calm) to 5 (critical). Only the characters, places and threads that appear in this section are listed._', '');
+    const where = path.length ? path.join(' › ') + ' › ' + (root.title || 'Untitled section') : null;
+    if (where) out.push(`**Where it sits:** ${where}`, '');
+    if (lastTime) {
+      const month = lastTime.month ? MONTHS[lastTime.month - 1] : '';
+      out.push(`**Time just before this section:** ${[lastTime.label, month && `(${month})`].filter(Boolean).join(' ') || 'time passes'}`, '');
+    }
+    if (inHolding) out.push('_This section is in Holding (set aside, not currently in the story)._', '');
+  } else {
   out.push(`# ${S.title || 'Untitled novel'}`, '');
   out.push('_Working scene outline for my novel, exported from Scene Flow. Sections and scenes are in story order; scenes are numbered in reading order. “Time” lines mark time passing between scenes. Intensity runs 1 (calm) to 5 (critical)._', '');
-  if (S.characters.length) {
-    out.push('## Characters', '');
-    for (const c of S.characters) {
+  }
+  const inScope = (x) => !root || usage.has(x.id);
+  const chars = S.characters.filter(inScope), threads = S.threads.filter(inScope), places = S.places.filter(inScope);
+  if (chars.length && opt.profiles !== false) {
+    out.push(root ? '## Characters in this section' : '## Characters', '');
+    for (const c of chars) {
       const stats = [`in ${scenes(usage.get(c.id) || 0)}`, povs.get(c.id) ? `POV in ${povs.get(c.id)}` : null].filter(Boolean).join(', ');
       const head = [c.alias, stats].filter(Boolean).join('; ');
       out.push(`- **${c.name || '(unnamed)'}** (${head})`);
@@ -2511,32 +2535,33 @@ function outlineMarkdown(opt) {
     }
     out.push('');
   }
-  const bookQs = S.todos.filter((t) => !t.done && t.text.trim());
+  const bookQs = root ? [] : S.todos.filter((t) => !t.done && t.text.trim());
   if (opt.questions && bookQs.length) {
     out.push('## To-dos and open questions (whole book)', '', ...bookQs.map((t) => `- ${t.kind === 'question' ? 'Question' : 'To-do'}: ${t.text.trim()}`), '');
   }
   if (opt.questions && S.tasks.length) {
-    const nums = sceneNums();
-    const rows = S.tasks.map((t) => { const left = taskScenes(t).filter(({ it }) => !it.done); return left.length ? `- ${t.text.trim()} — still to do in: ${left.map(({ n }) => nums.has(n.id) ? `Scene ${nums.get(n.id)}` : `held “${n.title}”`).join(', ')}` : null; }).filter(Boolean);
+    const here = new Set(); if (root) walk(root.children, (n) => here.add(n));
+    const rows = S.tasks.map((t) => { const left = taskScenes(t).filter(({ n, it }) => !it.done && (!root || here.has(n))); return left.length ? `- ${t.text.trim()} — still to do in: ${left.map(({ n }) => nums.has(n.id) ? `Scene ${nums.get(n.id)}` : `held “${n.title}”`).join(', ')}` : null; }).filter(Boolean);
     if (rows.length) out.push('## Changes still to make across scenes', '', ...rows, '');
   }
-  if (S.threads.length) {
+  if (threads.length) {
     out.push('## Plot threads', '');
-    for (const t of S.threads) out.push(`- **${t.name || '(unnamed)'}** (in ${scenes(usage.get(t.id) || 0)})${noteText(t.note)}`);
+    for (const t of threads) out.push(`- **${t.name || '(unnamed)'}** (in ${scenes(usage.get(t.id) || 0)})${noteText(t.note)}`);
     out.push('');
   }
-  if (S.places.length) {
+  if (places.length) {
     out.push('## Places', '');
-    for (const p of S.places) out.push(`- **${p.name || '(unnamed)'}** (in ${scenes(usage.get(p.id) || 0)})${noteText(p.note)}`);
+    for (const p of places) out.push(`- **${p.name || '(unnamed)'}** (in ${scenes(usage.get(p.id) || 0)})${noteText(p.note)}`);
     out.push('');
   }
-  if (opt.climate && S.climate.some(Boolean)) {
+  if (opt.climate && !root && S.climate.some(Boolean)) {
     out.push('## Typical weather by month', '');
     S.climate.forEach((w, i) => { if (w) out.push(`- ${MONTHS[i]}: ${w}`); });
     out.push('');
   }
   const ft = filterTarget();
-  out.push(opt.onlyFilter && ft ? `## Outline (only scenes with ${ft.name}; scene numbers are from the full book)` : '## Outline', '');
+  if (root) out.push(opt.onlyFilter && ft ? `## Outline (only scenes with ${ft.name})` : '## Outline', '');
+  else out.push(opt.onlyFilter && ft ? `## Outline (only scenes with ${ft.name}; scene numbers are from the full book)` : '## Outline', '');
   let num = 0, held = false;
   const list = (items, depth) => {
     for (const n of items) {
@@ -2553,7 +2578,7 @@ function outlineMarkdown(opt) {
         const when = [n.label, month && `(${month})`].filter(Boolean).join(' ');
         out.push(`> **Time:** ${when || 'time passes'}${weather ? ` · Weather: ${weather}` : ''}`, '');
       } else if (n.type === 'scene') {
-        if (!held) num++;
+        if (!held) num = root ? nums.get(n.id) : num + 1;
         if (!opt.scenes) continue;
         if (opt.onlyFilter && !sceneMatches(n)) continue;
         out.push(`**${held ? 'Held scene' : `Scene ${num}`}: ${n.title || 'Untitled scene'}**${opt.status ? ` · _${STATUS[n.status || 0]}_` : ''}`);
@@ -2570,17 +2595,21 @@ function outlineMarkdown(opt) {
       }
     }
   };
-  list(S.items, 0);
-  if (opt.holding && S.holding.children.length) {
+  if (root) { held = !nums.has(firstScene(root)); list([root], 0); }
+  else list(S.items, 0);
+  if (!root && opt.holding && S.holding.children.length) {
     out.push('## Holding (set aside, not currently in the story)', '');
     held = true;
     list(S.holding.children, 1);
   }
   return out.join('\n').replace(/\n{3,}/g, '\n\n').trim() + '\n';
 }
-function openAiExport() {
+function walk_has(list, node) { let f = false; walk(list, (n) => { if (n === node) f = true; }); return f; }
+function firstScene(sec) { let id = null; walk(sec.children, (n) => { if (!id && n.type === 'scene') id = n.id; }); return id; }
+function openAiExport(sec) {
   closePop();
-  const opt = { scenes: true, details: true, status: true, climate: true, holding: true, questions: true, onlyFilter: !!filter };
+  const root = sec && sec.type === 'section' ? sec : null;
+  const opt = { root, scenes: true, details: true, status: true, climate: true, holding: true, questions: true, profiles: true, onlyFilter: !!filter };
   const ta = h('textarea', { id: 'ai-md', spellcheck: 'false', 'aria-label': 'Outline as text' });
   const words = h('span', { class: 'stat' });
   const refresh = () => { ta.value = outlineMarkdown(opt); words.textContent = `${ta.value.split(/\s+/).length.toLocaleString()} words`; };
@@ -2588,16 +2617,16 @@ function openAiExport() {
     h('input', { type: 'checkbox', id: 'ai-' + key, checked: opt[key], onchange: (e) => { opt[key] = e.target.checked; refresh(); } }), label);
   const scrim = h('div', { class: 'scrim', onclick: (e) => { if (e.target === scrim) scrim.remove(); } },
     h('div', { class: 'modal', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'ai-h' },
-      h('h2', { id: 'ai-h' }, 'Share with AI'),
-      h('p', null, 'A plain-text version of your outline with names written out, so an AI can follow it easily. Copy it and paste it into a chat, then ask your question underneath. This is for reading only; use Backup to save or restore.'),
-      h('div', { class: 'btns' }, box('scenes', 'Scenes (off: sections only)'), box('details', 'Details'), box('status', 'Status'), box('questions', 'To-dos & questions'), box('climate', 'Weather table'), box('holding', 'Holding scenes'), filter && filterTarget() ? box('onlyFilter', `Only scenes with ${filterTarget().name}`) : null),
+      h('h2', { id: 'ai-h' }, root ? `Share “${root.title || 'Untitled section'}” with AI` : 'Share with AI'),
+      h('p', null, root ? 'Just this section, with the profiles of the characters in it. Copy it and paste it into a chat, then ask your question underneath.' : 'A plain-text version of your outline with names written out, so an AI can follow it easily. Copy it and paste it into a chat, then ask your question underneath. This is for reading only; use Backup to save or restore.'),
+      h('div', { class: 'btns' }, box('scenes', root ? 'Scenes (off: sub-sections only)' : 'Scenes (off: sections only)'), box('details', 'Details'), box('status', 'Status'), box('questions', 'To-dos & questions'), root ? box('profiles', 'Character profiles') : box('climate', 'Weather table'), root ? null : box('holding', 'Holding scenes'), filter && filterTarget() ? box('onlyFilter', `Only scenes with ${filterTarget().name}`) : null),
       ta,
       h('div', { class: 'btns' },
         h('button', { class: 'btn primary', onclick: async () => {
           try { await navigator.clipboard.writeText(ta.value); toast('Copied. Paste it into your AI chat.'); } catch (err) { ta.focus(); ta.select(); toast('Press Ctrl/⌘+C to copy'); }
         } }, 'Copy'),
         h('button', { class: 'btn', onclick: () => {
-          const a = h('a', { href: URL.createObjectURL(new Blob([ta.value], { type: 'text/markdown' })), download: `${(S.title || 'outline').replace(/[^\w\- ]+/g, '').trim() || 'outline'}.md` });
+          const a = h('a', { href: URL.createObjectURL(new Blob([ta.value], { type: 'text/markdown' })), download: `${((root ? `${S.title || 'outline'} - ${root.title || 'section'}` : S.title) || 'outline').replace(/[^\w\- ]+/g, '').trim() || 'outline'}.md` });
           document.body.append(a); a.click(); a.remove();
         } }, 'Download .md'),
         h('span', { class: 'spacer' }), words,
@@ -2649,7 +2678,7 @@ if (/iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'Mac
 }
 
 // When a newer version of the app is published, offer to reload instead of running a stale saved copy.
-const APP_VERSION = '2026-10-31.21';
+const APP_VERSION = '2026-11-01.1';
 async function checkForUpdate() {
   if (!/github\.io$/.test(location.hostname)) return;
   try {

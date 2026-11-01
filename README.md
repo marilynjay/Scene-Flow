@@ -28,6 +28,7 @@ Open `index.html` in any modern browser. There's nothing to install or build.
 - **Move out of / Move into** (⋯ menu): step anything out of the section it's in, landing right after that section, or into the section directly above it.
 - **Holding** sits below the outline for scenes you've set aside but might use later. Held scenes aren't numbered, counted or shown in the intensity flow. Move them back with Move to… or by dragging.
 - **Share with AI** turns your outline into plain text with names written out, ready to paste into an AI chat. You can leave out scene details, status or the weather table, or, while a filter is on, share only the matching scenes.
+- **Share a single section** from its **⋯** menu (Share with AI…): just that section with its sub-sections, scenes and time markers, where it sits in the book, the time marker before it, and the profiles of only the characters, places and plot threads it uses.
 - **Search** (`/`) and **Undo** (Ctrl/⌘+Z) for structural changes.
 
 ## Starting your own book
