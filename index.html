@@ -354,8 +354,24 @@ textarea::placeholder { color: var(--faint); }
 .title.tbtn:empty::before { content: attr(data-ph); color: var(--faint); }
 .modal.se { width: min(680px, 100%); }
 .se-head { display: flex; align-items: baseline; gap: 8px; min-width: 0; flex-wrap: wrap; }
+.se .notes-head { flex-wrap: nowrap; align-items: flex-start; }
+.se .se-head { flex: 1; row-gap: 3px; }
 .se-num { font: 600 14px/1.2 var(--book); }
 .se-where { color: var(--muted); font-size: var(--fs-s); }
+.se-within { max-width: 15em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 600 10.5px/1.4 var(--ui); padding: 1px 6px; border-radius: 3px; color: color-mix(in srgb, var(--c) 70%, var(--fg)); background: color-mix(in srgb, var(--c) 14%, transparent); }
+.ls { display: flex; flex-direction: column; gap: 4px; border-top: 1px solid var(--line); padding-top: 8px; margin-top: 4px; }
+.ls-head { display: flex; align-items: center; gap: 6px; }
+.ls-toggle { display: inline-flex; align-items: center; gap: 4px; font: 600 10.5px/1.2 var(--ui); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); padding: 4px 0; }
+.ls-toggle .caret { display: inline-grid; transition: transform .15s; }
+.ls-toggle[aria-expanded="true"] .caret { transform: rotate(90deg); }
+.ls-toggle .n { font-weight: 500; letter-spacing: 0; color: var(--faint); margin-left: 2px; }
+.ls-list { display: flex; flex-direction: column; max-height: 40vh; overflow-y: auto; }
+.ls-row { display: flex; align-items: center; gap: 6px; padding: 5px 4px; border-radius: 4px; text-align: left; color: var(--fg); min-width: 0; }
+.ls-row:hover { background: var(--hover, color-mix(in srgb, var(--fg) 6%, transparent)); }
+.ls-row .num { flex: none; min-width: 2.2em; color: var(--muted); font: 500 11px/1 var(--ui); text-align: right; }
+.ls-row.held .num { font-style: italic; }
+.ls-t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ls-w { flex: none; max-width: 38%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--faint); font-size: 11.5px; }
 .se-body { gap: 12px; }
 .se-title { width: 100%; font: 600 17px/1.3 var(--book); border: 1px solid var(--line); border-radius: 6px; background: var(--bg); padding: 7px 9px; outline: 0; color: var(--fg); }
 .se-title:focus { border-color: var(--accent); background: var(--panel); }
@@ -1723,6 +1739,38 @@ function openDetails(x, type, count, opts = {}) {
     oninput: () => { x.name = name.value; if (type === 'char') badge.textContent = initials(x.name); save(); } });
   const body = h('div', { class: 'profile' });
   const modeBtn = h('button', { class: 'btn', onclick: () => { editing = !editing; draw(); } });
+  // The scenes this thread / place / character is in, in reading order (held scenes last).
+  const has = (n) => type === 'thread' ? n.threads.includes(x.id) : type === 'place' ? n.place === x.id : n.chars.includes(x.id) || n.pov === x.id;
+  const tag = (n) => { if (type === 'thread') n.threads.push(x.id); else if (type === 'place') n.place = x.id; else n.chars.push(x.id); };
+  const theScenes = () => scenesInOrder().filter(has);
+  const countNow = () => { let k = 0; walk(S.items, (n) => { if (n.type === 'scene' && has(n)) k++; }); return k; };
+  let listOpen = type === 'thread' || !!opts.listOpen;
+  const goEdit = (n, isNew) => {
+    scrim.remove(); renderRail(); renderTree();
+    openSceneEditor(n, { isNew, within: { name: x.name || what, color: x.color, scenes: theScenes, tag }, back: () => openDetails(x, type, countNow(), { listOpen: true }) });
+  };
+  const newScene = () => { snapshot(); const n = blankScene(); tag(n); S.holding.children.push(n); save(); goEdit(n, true); };
+  const scenesBox = h('section', { class: 'ls' });
+  const drawScenes = () => {
+    const list = theScenes(), nums = sceneNums();
+    setKids(scenesBox,
+      h('div', { class: 'ls-head' },
+        h('button', { class: 'ls-toggle', 'aria-expanded': String(listOpen), onclick: () => { listOpen = !listOpen; drawScenes(); } },
+          h('span', { class: 'caret' }, icon('right')), 'Scenes', h('span', { class: 'n' }, list.length)),
+        h('span', { class: 'spacer' }),
+        list.some((n) => nums.has(n.id)) ? h('button', { class: 'btn sm', title: 'Close this and show only these scenes in the outline', onclick: () => { filter = { type, id: x.id }; scrim.remove(); if ($('#layout').classList.contains('railopen')) closeRail(); renderAll(); } }, 'Show in outline') : null,
+        h('button', { class: 'btn sm', title: 'A new scene in Holding, already in this ' + what, onclick: newScene }, '+ New scene')),
+      !listOpen ? null : list.length
+        ? h('div', { class: 'ls-list' }, list.map((n) => {
+            const hit = find(n.id), pl = placeById(n.place), where = hit && hit.parent === S.holding ? 'Holding' : hit && hit.parent ? hit.parent.title : '';
+            return h('button', { class: 'ls-row' + (nums.has(n.id) ? '' : ' held'), onclick: () => goEdit(n) },
+              h('span', { class: 'num' }, nums.get(n.id) || 'Held'),
+              pl ? h('span', { class: 'ptag', style: `--c:${pl.color}` }, placeTag(pl)) : null,
+              h('span', { class: 'ls-t' }, n.title || 'Untitled scene'),
+              where ? h('span', { class: 'ls-w' }, where) : null);
+          }))
+        : h('p', { class: 'pf-empty' }, `No scenes yet. + New scene starts one in Holding, ready to place later.`));
+  };
   let armed = false;
   const del = h('button', { class: 'btn warn', onclick: () => {
     if (!armed) { armed = true; del.textContent = 'Click again to delete'; return; }
@@ -1793,6 +1841,7 @@ function openDetails(x, type, count, opts = {}) {
         filled() ? null : h('p', { class: 'pf-empty' }, 'Nothing written yet. ', h('button', { onclick: () => { editing = true; draw(); } }, 'Add details')));
       body.scrollTop = 0;
     }
+    body.append(scenesBox);   // the scene list scrolls with the profile, right under it
   };
   const scrim = h('div', { class: 'scrim', onclick: (e) => { if (e.target === scrim) close(); } },
     h('div', { class: 'modal notes', role: 'dialog', 'aria-modal': 'true', 'aria-label': `${what} details` },
@@ -1803,7 +1852,7 @@ function openDetails(x, type, count, opts = {}) {
       h('div', { class: 'btns' }, del, h('span', { class: 'hint' }, 'Saves as you type.'), h('span', { class: 'spacer' }), h('button', { class: 'btn primary', onclick: close }, 'Done'))));
   scrim.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.stopPropagation(); close(); } });
   document.body.append(scrim);
-  draw();
+  draw(); drawScenes();
   if (opts.isNew) name.focus();
   else if (editing && !TOUCH) (x.name ? body.querySelector('input, textarea') : name)?.focus();
 }
@@ -2173,11 +2222,14 @@ function openSceneEditor(start, opts = {}) {
   const head = h('div', { class: 'se-head' });
   const prevB = h('button', { class: 'btn', 'aria-label': 'Previous scene', onclick: () => go(-1) }, '‹ Prev');
   const nextB = h('button', { class: 'btn', 'aria-label': 'Next scene', onclick: () => go(1) }, 'Next ›');
-  const close = () => { scrim.remove(); renderAll(); reveal(n.id); };
-  const go = (d) => { const all = scenesInOrder(); const i = all.indexOf(n) + d; if (i >= 0 && i < all.length) { n = all[i]; threadsOpen = false; draw(); body.scrollTop = 0; } };
+  const within = opts.within || null;   // stepping through one thread's (or person's, or place's) scenes
+  const order = () => within ? within.scenes() : scenesInOrder();
+  const close = () => { scrim.remove(); renderAll(); if (opts.back) opts.back(); else reveal(n.id); };
+  const go = (d) => { const all = order(); const i = all.indexOf(n) + d; if (i >= 0 && i < all.length) { n = all[i]; threadsOpen = false; draw(); body.scrollTop = 0; } };
   const addNext = () => {
     const hit = find(n.id); if (!hit) return;
     const x = blankScene(); x.place = n.place;   // a new scene usually happens in the same place
+    if (within) within.tag(x);
     hit.list.splice(hit.list.indexOf(n) + 1, 0, x);
     n = x; threadsOpen = false; save(); draw(); body.scrollTop = 0; focusTitle();
   };
@@ -2185,10 +2237,11 @@ function openSceneEditor(start, opts = {}) {
   const focusTitle = () => { const t = body.querySelector('.se-title'); if (t) { t.focus(); t.select(); } };
   const field = (label, ...kids) => h('section', { class: 'se-field' }, h('h3', null, label), kids);
   const draw = () => {
-    const all = scenesInOrder(), i = all.indexOf(n), nums = sceneNums(), hit = find(n.id);
-    prevB.disabled = i <= 0; nextB.disabled = i >= all.length - 1;
+    const all = order(), i = all.indexOf(n), nums = sceneNums(), hit = find(n.id);
+    prevB.disabled = i <= 0; nextB.disabled = i < 0 || i >= all.length - 1;
     setKids(head, h('span', { class: 'se-num' }, nums.get(n.id) ? `Scene ${nums.get(n.id)}` : 'Held scene'),
-      hit && hit.parent && hit.parent !== S.holding ? h('span', { class: 'se-where' }, `in ${hit.parent.title || 'Untitled section'}`) : null);
+      hit && hit.parent && hit.parent !== S.holding ? h('span', { class: 'se-where' }, `in ${hit.parent.title || 'Untitled section'}`) : null,
+      within && i >= 0 ? h('span', { class: 'se-within', style: `--c:${within.color}` }, `${i + 1}/${all.length} · ${within.name}`) : null);
     const title = h('input', { class: 'se-title', value: n.title, placeholder: 'Scene title', 'aria-label': 'Scene title', id: 'se-title',
       oninput: () => { n.title = title.value; save(); }, onkeydown: (e) => { if (e.key === 'Enter') { e.preventDefault(); title.blur(); } } });
     const charPick = (kind) => chooser({ kind: 'char', placeholder: 'Find or add a character…', none: kind === 'pov' ? 'No POV yet' : 'No one yet',
@@ -2678,7 +2731,7 @@ if (/iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'Mac
 }
 
 // When a newer version of the app is published, offer to reload instead of running a stale saved copy.
-const APP_VERSION = '2026-11-01.1';
+const APP_VERSION = '2026-11-02.1';
 async function checkForUpdate() {
   if (!/github\.io$/.test(location.hostname)) return;
   try {
